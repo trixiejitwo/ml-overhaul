@@ -1,0 +1,58 @@
+<div class="bg-surface-800 rounded-2xl border border-surface-700 p-5">
+  <h2 class="text-sm font-semibold text-slate-100 mb-1">Model Error Comparison</h2>
+  <p class="text-xs text-slate-500 mb-1">Sorted best to worst &mdash; shorter bar &amp; greener = better</p>
+  <p class="text-xs text-slate-600 mb-4">RMSE = on average, how many contacts off the forecast is per day on the holdout period. Lower is better.</p>
+
+  {% if comparison %}
+  <div class="space-y-2.5">
+    {% set ranked = comparison | selectattr('rmse', 'ne', none) | sort(attribute='rmse') | list %}
+    {% set unranked = comparison | selectattr('rmse', 'equalto', none) | list %}
+    {% set ranked = ranked + unranked %}
+    {% set max_rmse = (comparison | selectattr('rmse', 'ne', none) | map(attribute='rmse') | list | max) if ranked else 1 %}
+    {% for row in ranked %}
+      <div class="flex items-center gap-3">
+        <span class="w-28 text-xs text-slate-400 shrink-0 truncate">{{ row.model_label }}</span>
+        <div class="flex-1 h-2 rounded-full bg-surface-700 overflow-hidden">
+          {% if row.rmse is not none %}
+            <div class="h-full rounded-full transition-all duration-500"
+                 style="width: {{ (row.rmse / max_rmse * 100) | round(1) }}%; background-color: {{ row.color }};"></div>
+          {% endif %}
+        </div>
+        <span class="w-16 text-right text-xs font-mono text-slate-500 shrink-0">
+          {% if row.rmse is not none %}
+            {{ "%.0f"|format(row.rmse) }}
+          {% else %}
+            &mdash;
+          {% endif %}
+        </span>
+      </div>
+    {% endfor %}
+  </div>
+
+  <details class="mt-4">
+    <summary class="text-xs text-slate-500 cursor-pointer hover:text-slate-300 transition">Detailed metrics</summary>
+    <table class="w-full text-xs mt-2 text-slate-500">
+      <thead>
+        <tr class="text-left border-b border-surface-700">
+          <th class="py-1 font-medium text-slate-400">Model</th>
+          <th class="py-1 font-medium text-right text-slate-400">MAE</th>
+          <th class="py-1 font-medium text-right text-slate-400">RMSE</th>
+          <th class="py-1 font-medium text-right text-slate-400">sMAPE</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in ranked %}
+        <tr class="border-b border-surface-700">
+          <td class="py-1 text-slate-400">{{ row.model_label }}</td>
+          <td class="py-1 text-right">{{ "%.1f"|format(row.mae) if row.mae is not none else "&mdash;" }}</td>
+          <td class="py-1 text-right">{{ "%.1f"|format(row.rmse) if row.rmse is not none else "&mdash;" }}</td>
+          <td class="py-1 text-right">{{ "%.1f"|format(row.smape) if row.smape is not none else "&mdash;" }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+  {% else %}
+  <p class="text-sm text-slate-500">No model runs logged yet. Run the training notebook to populate this view.</p>
+  {% endif %}
+</div>

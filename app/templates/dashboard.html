@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="flex flex-col min-h-screen">
+
+  {# ---------- Top bar ---------- #}
+  <header class="flex items-center justify-between px-6 py-3 bg-surface-800 border-b border-surface-700">
+    <div class="flex items-center gap-2">
+      <div class="w-7 h-7 rounded-md bg-brand-600 flex items-center justify-center">
+        <span class="text-white text-sm font-bold">C</span>
+      </div>
+      <span class="font-semibold text-slate-100 tracking-tight">Contact Volume Forecast</span>
+    </div>
+    <div id="status-pill-wrapper" hx-get="/fragments/status" hx-trigger="load" hx-swap="innerHTML">
+      <div class="flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-surface-700 text-slate-500">
+        <span class="w-1.5 h-1.5 rounded-full bg-slate-600 animate-pulse"></span>
+        Loading status&hellip;
+      </div>
+    </div>
+  </header>
+
+  {# Hidden form — stores the last-applied control values for htmx submission #}
+  <form id="controls-form" class="hidden">
+    <input type="hidden" name="model"       value="{{ model_name }}">
+    <input type="hidden" name="granularity" value="{{ granularity }}">
+  </form>
+
+  {# ---------- Main content ---------- #}
+  <main class="flex-1 px-6 py-6 max-w-7xl mx-auto w-full">
+    <div id="dashboard-data"
+         hx-get="/fragments/dashboard-data?model={{ model_name }}&granularity={{ granularity }}"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+      {% include "fragments/dashboard_skeleton.html" %}
+    </div>
+  </main>
+</div>
+{% endblock %}

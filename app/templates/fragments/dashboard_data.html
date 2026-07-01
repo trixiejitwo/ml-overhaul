@@ -1,0 +1,116 @@
+{# Combined fragment: KPI strip + controls toolbar + charts + model comparison.
+   Rendered on first load (hx-trigger="load") and on every manual refresh. #}
+
+<div data-applied-state
+     data-model="{{ model_name }}"
+     data-granularity="{{ granularity }}"
+     style="display:none"></div>
+<script>window.syncAppliedState && window.syncAppliedState("{{ model_name }}", "{{ granularity }}");</script>
+
+{# ---- KPI strip ---- #}
+{% include "fragments/kpi_strip.html" %}
+
+{# ---- Controls toolbar ---- #}
+<div class="flex flex-wrap items-end gap-3 mb-4">
+
+  {# Model picker #}
+  <div class="flex flex-col gap-1">
+    <label class="text-[10px] font-medium uppercase tracking-widest text-slate-500">Model</label>
+    <select name="model" id="model-select" form="controls-form"
+            class="rounded-lg border border-surface-600 bg-surface-700 text-slate-100 text-sm py-1.5 px-2.5
+                   focus:ring-2 focus:ring-brand-500 focus:border-brand-500 focus:outline-none">
+      {% for value, label in model_options %}
+        <option value="{{ value }}" {% if value == model_name %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  {# Granularity — auto-triggers on change #}
+  <div class="flex flex-col gap-1">
+    <label class="text-[10px] font-medium uppercase tracking-widest text-slate-500">Granularity</label>
+    <select name="granularity" id="granularity-select"
+            class="rounded-lg border border-surface-600 bg-surface-700 text-slate-100 text-sm py-1.5 px-2.5
+                   focus:ring-2 focus:ring-brand-500 focus:border-brand-500 focus:outline-none">
+      {% for g in ['hourly', 'daily', 'weekly'] %}
+        <option value="{{ g }}" {% if g == granularity %}selected{% endif %}>{{ g|capitalize }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  {# Spacer #}
+  <div class="flex-1"></div>
+
+  {# Refresh data — reloads ingestion + forecast caches and re-renders everything #}
+  <button type="button" id="refresh-data-btn"
+          hx-post="/fragments/refresh-data"
+          hx-include="#controls-form"
+          hx-target="body"
+          hx-swap="none"
+          class="flex items-center gap-1.5 rounded-lg border border-surface-600 text-slate-400
+                 text-sm py-1.5 px-3 hover:bg-surface-700 hover:text-slate-200 transition h-[34px]">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+    Refresh data
+  </button>
+
+  {# Hidden trigger button — fired programmatically when model or granularity changes #}
+  <button type="button" id="apply-btn"
+          hx-get="/fragments/dashboard-data"
+          hx-include="#controls-form"
+          hx-target="#dashboard-data"
+          hx-swap="innerHTML"
+          style="display:none"></button>
+</div>
+
+{# ---- Hero chart ---- #}
+<section class="bg-surface-800 rounded-2xl border border-surface-700 p-5 mb-6">
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <h2 class="text-sm font-semibold text-slate-100">Contact Volume Forecast</h2>
+      <p class="text-xs text-slate-500 mt-0.5">
+        {% if kpis.forecast_start and kpis.forecast_end %}
+          Forecast spans {{ kpis.forecast_start.strftime('%b %d, %Y') }} &ndash; {{ kpis.forecast_end.strftime('%b %d, %Y') }}
+        {% else %}
+          No forecast published yet &mdash; run the training notebook
+        {% endif %}
+      </p>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="/fragments/export/csv?model={{ model_name }}&granularity={{ granularity }}"
+         class="text-xs font-medium text-slate-500 hover:text-slate-300 transition">
+        Download CSV
+      </a>
+    </div>
+  </div>
+
+  <div id="hero-chart-wrap" class="relative">
+    <div id="hero-chart" class="w-full"></div>
+  </div>
+  <script>
+    (function() {
+      var fig = {{ hero_chart | safe }};
+      window.drawPlotlyChart('hero-chart', fig);
+    })();
+  </script>
+</section>
+
+{# ---- Weekly + comparison grid ---- #}
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+  <div class="bg-surface-800 rounded-2xl border border-surface-700 p-5">
+    <h2 class="text-sm font-semibold text-slate-100 mb-1">Weekly Volume</h2>
+    <p class="text-xs text-slate-500 mb-4">Forecast bars &middot; actuals line overlay as data arrives</p>
+    <div id="weekly-chart" class="w-full"></div>
+    <script>
+      (function() {
+        var fig = {{ weekly_chart | safe }};
+        window.drawPlotlyChart('weekly-chart', fig);
+      })();
+    </script>
+  </div>
+
+  {% include "fragments/model_comparison.html" %}
+
+</section>

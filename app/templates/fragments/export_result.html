@@ -1,0 +1,11 @@
+{% if success %}
+<p class="text-xs text-emerald-600 flex items-center gap-1.5">
+  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+  Exported to a new sheet: {{ sheet_name }}
+</p>
+{% else %}
+<p class="text-xs text-amber-600 flex items-center gap-1.5">
+  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+  {{ message }}
+</p>
+{% endif %}

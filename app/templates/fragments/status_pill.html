@@ -1,0 +1,20 @@
+{% if oob_refresh %}
+<div id="status-pill-wrapper" hx-swap-oob="true">
+{% endif %}
+
+<div class="flex items-center gap-2 text-xs px-3 py-1.5 rounded-full
+            {{ 'bg-amber-900/40 text-amber-400' if status.is_stale else 'bg-surface-700 text-slate-400' }}">
+  <span class="w-1.5 h-1.5 rounded-full {{ 'bg-amber-500 animate-pulse' if status.is_stale else 'bg-emerald-500' }}"></span>
+  {% if status.forecast_stale %}
+    No forecast published
+  {% elif status.data_stale %}
+    Ingestion data may be stale &mdash;
+    {% if status.data_as_of %}as of {{ status.data_as_of.strftime('%b %d, %H:%M') }}{% endif %}
+  {% else %}
+    Data as of {{ status.data_as_of.strftime('%b %d, %H:%M') if status.data_as_of else '—' }}
+  {% endif %}
+</div>
+
+{% if oob_refresh %}
+</div>
+{% endif %}

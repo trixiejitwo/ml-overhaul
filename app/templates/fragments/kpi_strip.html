@@ -1,0 +1,63 @@
+<section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+
+  {# Next-week forecast volume #}
+  <div class="bg-surface-800 rounded-2xl border border-surface-700 p-4">
+    <p class="text-xs text-slate-500 mb-1">Next-week forecast</p>
+    {% if kpis.next_week_vol %}
+      <p class="text-2xl font-semibold text-slate-100">{{ "{:,}".format(kpis.next_week_vol) }}</p>
+      <p class="text-xs text-slate-500 mt-0.5">
+        contacts
+        {% if kpis.forecast_start %}
+          &middot; from {{ kpis.forecast_start.strftime('%b %d') }}
+        {% endif %}
+      </p>
+    {% else %}
+      <p class="text-2xl font-semibold text-slate-600">&mdash;</p>
+      <p class="text-xs text-slate-500 mt-0.5">no forecast available</p>
+    {% endif %}
+  </div>
+
+  {# % change vs last comparable week #}
+  <div class="bg-surface-800 rounded-2xl border border-surface-700 p-4">
+    <p class="text-xs text-slate-500 mb-1">vs. last week</p>
+    {% if kpis.pct_change_vs_last_week is not none %}
+      {% set pct = kpis.pct_change_vs_last_week %}
+      <p class="text-2xl font-semibold {{ 'text-emerald-400' if pct < 0 else 'text-amber-400' if pct > 15 else 'text-slate-100' }}">
+        {{ "%+.1f"|format(pct) }}%
+      </p>
+    {% else %}
+      <p class="text-2xl font-semibold text-slate-600">&mdash;</p>
+    {% endif %}
+    <p class="text-xs text-slate-500 mt-0.5">change in volume</p>
+  </div>
+
+  {# Confidence + accuracy #}
+  <div class="bg-surface-800 rounded-2xl border border-surface-700 p-4">
+    <p class="text-xs text-slate-500 mb-1">Forecast confidence</p>
+    <p class="text-2xl font-semibold text-slate-100">
+      {{ kpis.confidence_label }}
+      {% if kpis.accuracy_pct is not none %}
+        <span class="text-base font-medium text-slate-400">&middot; {{ kpis.accuracy_pct }}%</span>
+      {% endif %}
+    </p>
+    <p class="text-xs text-slate-500 mt-0.5">{{ kpis.model_label }} &middot; holdout accuracy</p>
+  </div>
+
+  {# Forecast run timestamp #}
+  <div class="bg-surface-800 rounded-2xl border border-surface-700 p-4">
+    <p class="text-xs text-slate-500 mb-1">Last forecast run</p>
+    {% if kpis.run_at %}
+      <p class="text-lg font-semibold text-slate-100 leading-tight">
+        {{ kpis.run_at.strftime('%b %d, %Y') }}
+      </p>
+      <p class="text-xs text-slate-500 mt-0.5">
+        at {{ kpis.run_at.strftime('%I:%M %p') }}
+        &middot; data through {{ kpis.data_as_of.strftime('%b %d') if kpis.data_as_of else '—' }}
+      </p>
+    {% else %}
+      <p class="text-2xl font-semibold text-slate-600">&mdash;</p>
+      <p class="text-xs text-slate-500 mt-0.5">run the training notebook</p>
+    {% endif %}
+  </div>
+
+</section>

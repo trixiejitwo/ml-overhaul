@@ -1,0 +1,36 @@
+{# Shown instantly on first page load while the real dashboard data (which
+   may require a slow first-time data ingest + model retrain) loads via htmx. #}
+<section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  {% for _ in range(4) %}
+  <div class="bg-surface-800 rounded-2xl border border-surface-700 p-4">
+    <div class="h-3 w-20 bg-surface-700 rounded animate-pulse mb-3"></div>
+    <div class="h-6 w-16 bg-surface-700 rounded animate-pulse mb-2"></div>
+    <div class="h-3 w-24 bg-surface-700 rounded animate-pulse"></div>
+  </div>
+  {% endfor %}
+</section>
+
+<section class="bg-surface-800 rounded-2xl border border-surface-700 p-5 mb-6">
+  <div class="h-4 w-48 bg-surface-700 rounded animate-pulse mb-2"></div>
+  <div class="h-3 w-64 bg-surface-700 rounded animate-pulse mb-6"></div>
+  <div class="h-[420px] w-full bg-surface-700/50 rounded-lg animate-pulse flex items-center justify-center">
+    <svg class="animate-spin h-6 w-6 text-brand-500" viewBox="0 0 24 24" fill="none">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+    </svg>
+  </div>
+</section>
+
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <div class="bg-surface-800 rounded-2xl border border-surface-700 p-5">
+    <div class="h-4 w-40 bg-surface-700 rounded animate-pulse mb-2"></div>
+    <div class="h-3 w-48 bg-surface-700 rounded animate-pulse mb-6"></div>
+    <div class="h-[300px] w-full bg-surface-700/50 rounded-lg animate-pulse"></div>
+  </div>
+  <div class="bg-surface-800 rounded-2xl border border-surface-700 p-5">
+    <div class="h-4 w-40 bg-surface-700 rounded animate-pulse mb-4"></div>
+    {% for _ in range(7) %}
+    <div class="h-2 w-full bg-surface-700 rounded animate-pulse mb-3"></div>
+    {% endfor %}
+  </div>
+</section>

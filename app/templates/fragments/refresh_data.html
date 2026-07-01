@@ -1,0 +1,9 @@
+{# OOB swap 1: status pill #}
+<div id="status-pill-wrapper" hx-swap-oob="true">
+  {% include "fragments/status_pill.html" %}
+</div>
+
+{# OOB swap 2: full dashboard content #}
+<div id="dashboard-data" hx-swap-oob="innerHTML">
+  {% include "fragments/dashboard_data.html" %}
+</div>
