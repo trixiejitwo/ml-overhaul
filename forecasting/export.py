@@ -161,28 +161,46 @@ def _upsert_meta(spreadsheet, sheet_name: str, run_at: datetime,
                  metrics_by_model: dict = None):
     """
     Append a row to _meta, creating the sheet if it doesn't exist yet.
-    metrics_by_model: optional dict of {model_name: {mae, rmse, smape}} so the
-    app can read accuracy without touching the registry.
-    Each model gets three columns: {name}_mae, {name}_rmse, {name}_smape.
+    If metric columns are missing from an existing header row, they are added
+    before appending so the new row always lands in the right columns.
     """
+    metric_cols = []
+    for name in MODEL_NAMES:
+        metric_cols += [f"{name}_mae", f"{name}_rmse", f"{name}_smape"]
+
     try:
         meta_ws = spreadsheet.worksheet(META_SHEET)
+        # Check whether the metric columns already exist in the header
+        existing_header = meta_ws.row_values(1)
+        missing = [c for c in metric_cols if c not in existing_header]
+        if missing:
+            # Extend the header row with the missing metric columns
+            new_header = existing_header + missing
+            meta_ws.update([new_header], "A1")
     except Exception:
         meta_ws = spreadsheet.add_worksheet(title=META_SHEET, rows=500, cols=50)
-        header = ["sheet_name", "run_at", "data_as_of", "horizon_hours"]
-        if metrics_by_model:
-            for name in MODEL_NAMES:
-                header += [f"{name}_mae", f"{name}_rmse", f"{name}_smape"]
+        header = ["sheet_name", "run_at", "data_as_of", "horizon_hours"] + metric_cols
         meta_ws.append_row(header, value_input_option="RAW")
 
-    row = [sheet_name,
-           run_at.strftime("%Y-%m-%d %H:%M:%S"),
-           str(data_as_of.date()),
-           horizon_hours]
+    # Re-read the header to know which column each value belongs to
+    header = meta_ws.row_values(1)
+    col_index = {h: i for i, h in enumerate(header)}
+
+    base_row = [sheet_name,
+                run_at.strftime("%Y-%m-%d %H:%M:%S"),
+                str(data_as_of.date()),
+                horizon_hours]
+    row = [""] * len(header)
+    for i, v in enumerate(base_row):
+        row[i] = v
+
     if metrics_by_model:
         for name in MODEL_NAMES:
             m = metrics_by_model.get(name, {})
-            row += [m.get("mae"), m.get("rmse"), m.get("smape")]
+            for suffix, key in (("_mae", "mae"), ("_rmse", "rmse"), ("_smape", "smape")):
+                col = f"{name}{suffix}"
+                if col in col_index:
+                    row[col_index[col]] = m.get(key, "")
 
     meta_ws.append_row(row, value_input_option="RAW")
 
