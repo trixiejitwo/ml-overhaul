@@ -8,9 +8,6 @@ def create_app() -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="../static", static_url_path="/static")
     app.secret_key = config.FLASK_SECRET_KEY
 
-    from forecasting import registry
-    registry.init_db()
-
     from app.routes.pages import pages_bp
     from app.routes.fragments import fragments_bp
 
