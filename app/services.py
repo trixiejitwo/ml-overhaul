@@ -18,16 +18,33 @@ import plotly.graph_objects as go
 import plotly.io as pio
 
 import config
-from forecasting import registry
-from forecasting.features import us_holiday_dates
 from forecasting.forecast_reader import (
     get_latest_meta,
     get_model_series,
     read_forecast_sheet,
 )
 from forecasting.ingestion import load_series
-from forecasting.metrics import smape_to_confidence_label
-from forecasting.models import MODEL_LABELS, MODEL_NAMES
+
+MODEL_NAMES = ["XGBoost", "LightGBM", "RandomForest", "SeasonalNaive", "HoltWinters", "Prophet", "Ridge"]
+MODEL_LABELS = {
+    "XGBoost":      "XGBoost",
+    "LightGBM":     "LightGBM",
+    "RandomForest": "Random Forest",
+    "SeasonalNaive":"Seasonal-Naive Baseline",
+    "HoltWinters":  "Holt-Winters (ETS)",
+    "Prophet":      "Prophet",
+    "Ridge":        "Ridge Regression",
+}
+
+
+def _smape_to_confidence_label(smape: float | None) -> str:
+    if smape is None:
+        return "Unrated"
+    if smape <= 10:
+        return "High"
+    if smape <= 20:
+        return "Medium"
+    return "Low"
 
 MODEL_COLORS = {
     "XGBoost":      "#f59e0b",
@@ -159,11 +176,15 @@ def refresh_data() -> dict:
 # ---------------------------------------------------------------------------
 
 def best_active_model() -> str:
-    """Lowest-RMSE active run from the registry, fallback to first MODEL_NAME."""
-    active = registry.get_active_runs_all_models()
-    if not active:
+    """Lowest-RMSE model from _meta metrics, fallback to first MODEL_NAME."""
+    meta = get_forecast_meta()
+    if meta is None:
         return MODEL_NAMES[0]
-    return min(active, key=lambda n: active[n]["rmse"])
+    metrics = meta.get("metrics_by_model", {})
+    ranked = [(n, m["rmse"]) for n, m in metrics.items() if m.get("rmse") is not None]
+    if not ranked:
+        return MODEL_NAMES[0]
+    return min(ranked, key=lambda x: x[1])[0]
 
 
 # ---------------------------------------------------------------------------
@@ -226,11 +247,11 @@ def kpi_strip_data(model_name: str, granularity: str) -> dict:
             if last_comparable and last_comparable != 0:
                 pct_change = (next_week_vol - last_comparable) / last_comparable * 100
 
-    # Accuracy from registry
-    active = registry.get_active_run(model_name)
-    confidence_label = smape_to_confidence_label(active["smape"]) if active else "Unrated"
-    accuracy_pct = (round(100 - active["smape"], 1)
-                    if active and active.get("smape") is not None else None)
+    # Accuracy from _meta metrics (written by notebook at publish time)
+    meta_model = (meta.get("metrics_by_model", {}) or {}).get(model_name) if meta else None
+    smape = meta_model.get("smape") if meta_model else None
+    confidence_label = _smape_to_confidence_label(smape)
+    accuracy_pct = round(100 - smape, 1) if smape is not None else None
 
     return {
         "model_name":              model_name,
@@ -253,11 +274,14 @@ def kpi_strip_data(model_name: str, granularity: str) -> dict:
 def _holiday_ticks(index: pd.DatetimeIndex) -> list[tuple]:
     if len(index) == 0:
         return []
-    import holidays as _holidays
-    years = range(index.min().year, index.max().year + 1)
-    cal   = _holidays.US(years=list(years))
-    lo, hi = index.min().date(), index.max().date()
-    return [(d, name) for d, name in cal.items() if lo <= d <= hi]
+    try:
+        import holidays as _holidays
+        years = range(index.min().year, index.max().year + 1)
+        cal   = _holidays.US(years=list(years))
+        lo, hi = index.min().date(), index.max().date()
+        return [(d, name) for d, name in cal.items() if lo <= d <= hi]
+    except Exception:
+        return []
 
 
 # ---------------------------------------------------------------------------
@@ -297,7 +321,9 @@ def build_hero_chart(model_name: str, granularity: str = "daily") -> str:
     resampling, then split at the first forecast bucket so both sides of the
     seam land in the same resampled bin and the join is continuous.
     """
-    from forecasting.utils import trailing_window
+    def trailing_window(s, days):
+        cutoff = s.index.max() - pd.Timedelta(days=days)
+        return s.loc[s.index > cutoff]
 
     series = get_series()
     blocks = get_forecast_blocks()
@@ -449,7 +475,9 @@ def build_weekly_chart(model_name: str) -> str:
       - Actuals as a line overlaid on top, extending into the forecast period
         as time passes and new data arrives (live validation).
     """
-    from forecasting.utils import trailing_window
+    def trailing_window(s, days):
+        cutoff = s.index.max() - pd.Timedelta(days=days)
+        return s.loc[s.index > cutoff]
 
     series = get_series()
     blocks = get_forecast_blocks()
@@ -562,9 +590,11 @@ def _rmse_to_gradient_color(rank: int, total: int) -> str:
 
 
 def model_comparison_data() -> list:
-    active = registry.get_active_runs_all_models()
+    meta = get_forecast_meta()
+    metrics = (meta.get("metrics_by_model") or {}) if meta else {}
+
     ranked = sorted(
-        [(n, r) for n, r in active.items() if r and r.get("rmse") is not None],
+        [(n, m) for n, m in metrics.items() if m.get("rmse") is not None],
         key=lambda x: x[1]["rmse"],
     )
     rank_map = {n: i for i, (n, _) in enumerate(ranked)}
@@ -572,13 +602,13 @@ def model_comparison_data() -> list:
 
     rows = []
     for name in MODEL_NAMES:
-        run = active.get(name)
+        m = metrics.get(name)
         rows.append({
             "model_name":  name,
             "model_label": MODEL_LABELS.get(name, name),
-            "mae":   run["mae"]   if run else None,
-            "rmse":  run["rmse"]  if run else None,
-            "smape": run["smape"] if run else None,
+            "mae":   m["mae"]   if m else None,
+            "rmse":  m["rmse"]  if m else None,
+            "smape": m["smape"] if m else None,
             "color": _rmse_to_gradient_color(rank_map[name], total)
                      if name in rank_map else "#334155",
         })

@@ -2,7 +2,7 @@
 from flask import Blueprint, render_template, request
 
 from app import services
-from forecasting.models import MODEL_LABELS, MODEL_NAMES
+from app.services import MODEL_LABELS, MODEL_NAMES
 
 pages_bp = Blueprint("pages", __name__)
 

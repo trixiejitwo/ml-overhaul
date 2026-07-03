@@ -8,7 +8,7 @@ import io
 from flask import Blueprint, render_template, request, send_file
 
 from app import services
-from forecasting.models import MODEL_LABELS, MODEL_NAMES
+from app.services import MODEL_LABELS, MODEL_NAMES
 
 fragments_bp = Blueprint("fragments", __name__)
 

@@ -25,7 +25,17 @@ from gspread_dataframe import get_as_dataframe
 
 import config
 from forecasting.ingestion import get_client
-from forecasting.models import MODEL_LABELS, MODEL_NAMES
+
+MODEL_NAMES = ["XGBoost", "LightGBM", "RandomForest", "SeasonalNaive", "HoltWinters", "Prophet", "Ridge"]
+MODEL_LABELS = {
+    "XGBoost":      "XGBoost",
+    "LightGBM":     "LightGBM",
+    "RandomForest": "Random Forest",
+    "SeasonalNaive":"Seasonal-Naive Baseline",
+    "HoltWinters":  "Holt-Winters (ETS)",
+    "Prophet":      "Prophet",
+    "Ridge":        "Ridge Regression",
+}
 
 _META_SHEET = "_meta"
 
@@ -58,11 +68,26 @@ def get_latest_meta(dest_url: str = None) -> dict | None:
         return None
 
     last = df.iloc[-1]
+
+    # Read per-model metrics if present (written by publish_forecast_run)
+    metrics_by_model = {}
+    for name in MODEL_NAMES:
+        mae_col   = f"{name}_mae"
+        rmse_col  = f"{name}_rmse"
+        smape_col = f"{name}_smape"
+        if rmse_col in last.index and pd.notna(last[rmse_col]):
+            metrics_by_model[name] = {
+                "mae":   float(last[mae_col])   if mae_col   in last.index and pd.notna(last[mae_col])   else None,
+                "rmse":  float(last[rmse_col])  if rmse_col  in last.index and pd.notna(last[rmse_col])  else None,
+                "smape": float(last[smape_col]) if smape_col in last.index and pd.notna(last[smape_col]) else None,
+            }
+
     return {
-        "sheet_name":   str(last["sheet_name"]),
-        "run_at":       datetime.strptime(str(last["run_at"]), "%Y-%m-%d %H:%M:%S"),
-        "data_as_of":   pd.Timestamp(str(last["data_as_of"])),
-        "horizon_hours": int(float(last["horizon_hours"])),
+        "sheet_name":      str(last["sheet_name"]),
+        "run_at":          datetime.strptime(str(last["run_at"]), "%Y-%m-%d %H:%M:%S"),
+        "data_as_of":      pd.Timestamp(str(last["data_as_of"])),
+        "horizon_hours":   int(float(last["horizon_hours"])),
+        "metrics_by_model": metrics_by_model,
     }
 
 

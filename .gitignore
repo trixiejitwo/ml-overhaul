@@ -1,6 +1,6 @@
 .env
 service_account.json
-# data/registry.db  — committed intentionally so deployed app has model metadata
+data/registry.db
 data/cache/
 __pycache__/
 *.pyc

@@ -14,7 +14,17 @@ from gspread_dataframe import get_as_dataframe, set_with_dataframe
 
 import config
 from forecasting.ingestion import get_client
-from forecasting.models import MODEL_LABELS, MODEL_NAMES
+
+MODEL_NAMES = ["XGBoost", "LightGBM", "RandomForest", "SeasonalNaive", "HoltWinters", "Prophet", "Ridge"]
+MODEL_LABELS = {
+    "XGBoost":      "XGBoost",
+    "LightGBM":     "LightGBM",
+    "RandomForest": "Random Forest",
+    "SeasonalNaive":"Seasonal-Naive Baseline",
+    "HoltWinters":  "Holt-Winters (ETS)",
+    "Prophet":      "Prophet",
+    "Ridge":        "Ridge Regression",
+}
 
 # Fixed column positions in the horizontal layout so the reader never has to
 # guess.  Each block is: 1 timestamp col + N model cols.  Separator cols
@@ -94,6 +104,7 @@ def publish_forecast_run(
     forecasts: dict,
     data_as_of: pd.Timestamp,
     dest_url: str = None,
+    metrics_by_model: dict = None,
 ) -> str:
     """
     Write one timestamped worksheet to the forecast spreadsheet and upsert a
@@ -129,7 +140,8 @@ def publish_forecast_run(
 
     # Upsert _meta sheet — one row per run, never deleted
     _upsert_meta(spreadsheet, sheet_name, run_at, data_as_of,
-                 horizon_hours=len(forecasts[MODEL_NAMES[0]]))
+                 horizon_hours=len(forecasts[MODEL_NAMES[0]]),
+                 metrics_by_model=metrics_by_model)
 
     print(f"Published: {sheet_name}  ({len(export_df)} rows, data_as_of={data_as_of.date()})")
     return sheet_name
@@ -145,22 +157,34 @@ def _col_letter(n: int) -> str:
 
 
 def _upsert_meta(spreadsheet, sheet_name: str, run_at: datetime,
-                 data_as_of: pd.Timestamp, horizon_hours: int):
-    """Append a row to _meta, creating the sheet if it doesn't exist yet."""
+                 data_as_of: pd.Timestamp, horizon_hours: int,
+                 metrics_by_model: dict = None):
+    """
+    Append a row to _meta, creating the sheet if it doesn't exist yet.
+    metrics_by_model: optional dict of {model_name: {mae, rmse, smape}} so the
+    app can read accuracy without touching the registry.
+    Each model gets three columns: {name}_mae, {name}_rmse, {name}_smape.
+    """
     try:
         meta_ws = spreadsheet.worksheet(META_SHEET)
     except Exception:
-        meta_ws = spreadsheet.add_worksheet(title=META_SHEET, rows=500, cols=5)
-        meta_ws.append_row(["sheet_name", "run_at", "data_as_of", "horizon_hours"],
-                           value_input_option="RAW")
+        meta_ws = spreadsheet.add_worksheet(title=META_SHEET, rows=500, cols=50)
+        header = ["sheet_name", "run_at", "data_as_of", "horizon_hours"]
+        if metrics_by_model:
+            for name in MODEL_NAMES:
+                header += [f"{name}_mae", f"{name}_rmse", f"{name}_smape"]
+        meta_ws.append_row(header, value_input_option="RAW")
 
-    meta_ws.append_row(
-        [sheet_name,
-         run_at.strftime("%Y-%m-%d %H:%M:%S"),
-         str(data_as_of.date()),
-         horizon_hours],
-        value_input_option="RAW",
-    )
+    row = [sheet_name,
+           run_at.strftime("%Y-%m-%d %H:%M:%S"),
+           str(data_as_of.date()),
+           horizon_hours]
+    if metrics_by_model:
+        for name in MODEL_NAMES:
+            m = metrics_by_model.get(name, {})
+            row += [m.get("mae"), m.get("rmse"), m.get("smape")]
+
+    meta_ws.append_row(row, value_input_option="RAW")
 
 
 # ---------------------------------------------------------------------------
