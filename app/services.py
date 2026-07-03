@@ -444,6 +444,7 @@ def build_hero_chart(model_name: str, granularity: str = "daily") -> str:
         x_end = series.index.max()
 
     fig.update_layout(
+        template="none",
         margin=dict(l=40, r=20, t=20, b=40),
         height=420,
         plot_bgcolor="#0f172a", paper_bgcolor="#0f172a",
@@ -558,6 +559,7 @@ def build_weekly_chart(model_name: str) -> str:
         ))
 
     fig.update_layout(
+        template="none",
         margin=dict(l=40, r=20, t=20, b=40),
         height=300,
         barmode="stack",
