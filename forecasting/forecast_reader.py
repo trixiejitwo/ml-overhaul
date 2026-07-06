@@ -26,15 +26,23 @@ from gspread_dataframe import get_as_dataframe
 import config
 from forecasting.ingestion import get_client
 
-MODEL_NAMES = ["XGBoost", "LightGBM", "RandomForest", "SeasonalNaive", "HoltWinters", "Prophet", "Ridge"]
+MODEL_NAMES = [
+    "XGBoost", "LightGBM", "RandomForest", "SeasonalNaive", "HoltWinters", "Prophet", "Ridge",
+    "XGBoost+Sales", "LightGBM+Sales", "RandomForest+Sales", "Ridge+Sales", "Prophet+Sales",
+]
 MODEL_LABELS = {
-    "XGBoost":      "XGBoost",
-    "LightGBM":     "LightGBM",
-    "RandomForest": "Random Forest",
-    "SeasonalNaive":"Seasonal-Naive Baseline",
-    "HoltWinters":  "Holt-Winters (ETS)",
-    "Prophet":      "Prophet",
-    "Ridge":        "Ridge Regression",
+    "XGBoost":            "XGBoost",
+    "LightGBM":           "LightGBM",
+    "RandomForest":       "Random Forest",
+    "SeasonalNaive":      "Seasonal-Naive Baseline",
+    "HoltWinters":        "Holt-Winters (ETS)",
+    "Prophet":            "Prophet",
+    "Ridge":              "Ridge Regression",
+    "XGBoost+Sales":      "XGBoost + Sales",
+    "LightGBM+Sales":     "LightGBM + Sales",
+    "RandomForest+Sales": "Random Forest + Sales",
+    "Ridge+Sales":        "Ridge + Sales",
+    "Prophet+Sales":      "Prophet + Sales",
 }
 
 _META_SHEET = "_meta"
@@ -75,11 +83,13 @@ def get_latest_meta(dest_url: str = None) -> dict | None:
         mae_col   = f"{name}_mae"
         rmse_col  = f"{name}_rmse"
         smape_col = f"{name}_smape"
+        mape_col  = f"{name}_mape"
         if rmse_col in last.index and pd.notna(last[rmse_col]):
             metrics_by_model[name] = {
                 "mae":   float(last[mae_col])   if mae_col   in last.index and pd.notna(last[mae_col])   else None,
                 "rmse":  float(last[rmse_col])  if rmse_col  in last.index and pd.notna(last[rmse_col])  else None,
                 "smape": float(last[smape_col]) if smape_col in last.index and pd.notna(last[smape_col]) else None,
+                "mape":  float(last[mape_col])  if mape_col  in last.index and pd.notna(last[mape_col])  else None,
             }
 
     return {

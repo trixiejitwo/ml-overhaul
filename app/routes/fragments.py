@@ -75,11 +75,11 @@ def refresh_data():
 
 
 def sorted_model_options():
-    """Return MODEL_NAMES ordered best→worst by RMSE; unranked models at end."""
-    active = services.model_comparison_data()  # already includes all models
-    ranked   = [r for r in active if r["rmse"] is not None]
-    unranked = [r for r in active if r["rmse"] is None]
-    ranked.sort(key=lambda r: r["rmse"])
+    """Return MODEL_NAMES ordered best→worst by MAPE; unranked models at end."""
+    active = services.model_comparison_data()
+    ranked   = [r for r in active if r["mape"] is not None]
+    unranked = [r for r in active if r["mape"] is None]
+    ranked.sort(key=lambda r: r["mape"])
     ordered = ranked + unranked
     return [(r["model_name"], r["model_label"]) for r in ordered]
 

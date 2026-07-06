@@ -25,24 +25,32 @@ from forecasting.forecast_reader import (
 )
 from forecasting.ingestion import load_series
 
-MODEL_NAMES = ["XGBoost", "LightGBM", "RandomForest", "SeasonalNaive", "HoltWinters", "Prophet", "Ridge"]
+MODEL_NAMES = [
+    "XGBoost", "LightGBM", "RandomForest", "SeasonalNaive", "HoltWinters", "Prophet", "Ridge",
+    "XGBoost+Sales", "LightGBM+Sales", "RandomForest+Sales", "Ridge+Sales", "Prophet+Sales",
+]
 MODEL_LABELS = {
-    "XGBoost":      "XGBoost",
-    "LightGBM":     "LightGBM",
-    "RandomForest": "Random Forest",
-    "SeasonalNaive":"Seasonal-Naive Baseline",
-    "HoltWinters":  "Holt-Winters (ETS)",
-    "Prophet":      "Prophet",
-    "Ridge":        "Ridge Regression",
+    "XGBoost":            "XGBoost",
+    "LightGBM":           "LightGBM",
+    "RandomForest":       "Random Forest",
+    "SeasonalNaive":      "Seasonal-Naive Baseline",
+    "HoltWinters":        "Holt-Winters (ETS)",
+    "Prophet":            "Prophet",
+    "Ridge":              "Ridge Regression",
+    "XGBoost+Sales":      "XGBoost + Sales",
+    "LightGBM+Sales":     "LightGBM + Sales",
+    "RandomForest+Sales": "Random Forest + Sales",
+    "Ridge+Sales":        "Ridge + Sales",
+    "Prophet+Sales":      "Prophet + Sales",
 }
 
 
-def _smape_to_confidence_label(smape: float | None) -> str:
-    if smape is None:
+def _mape_to_confidence_label(mape: float | None) -> str:
+    if mape is None:
         return "Unrated"
-    if smape <= 10:
+    if mape <= 10:
         return "High"
-    if smape <= 20:
+    if mape <= 20:
         return "Medium"
     return "Low"
 
@@ -176,12 +184,15 @@ def refresh_data() -> dict:
 # ---------------------------------------------------------------------------
 
 def best_active_model() -> str:
-    """Lowest-RMSE model from _meta metrics, fallback to first MODEL_NAME."""
+    """Lowest-MAPE model from _meta metrics, fallback to first MODEL_NAME."""
     meta = get_forecast_meta()
     if meta is None:
         return MODEL_NAMES[0]
     metrics = meta.get("metrics_by_model", {})
-    ranked = [(n, m["rmse"]) for n, m in metrics.items() if m.get("rmse") is not None]
+    ranked = [(n, m["mape"]) for n, m in metrics.items() if m.get("mape") is not None]
+    if not ranked:
+        # fallback to rmse if mape not yet written (old _meta rows)
+        ranked = [(n, m["rmse"]) for n, m in metrics.items() if m.get("rmse") is not None]
     if not ranked:
         return MODEL_NAMES[0]
     return min(ranked, key=lambda x: x[1])[0]
@@ -249,9 +260,8 @@ def kpi_strip_data(model_name: str, granularity: str) -> dict:
 
     # Accuracy from _meta metrics (written by notebook at publish time)
     meta_model = (meta.get("metrics_by_model", {}) or {}).get(model_name) if meta else None
-    smape = meta_model.get("smape") if meta_model else None
-    confidence_label = _smape_to_confidence_label(smape)
-    accuracy_pct = round(100 - smape, 1) if smape is not None else None
+    mape = meta_model.get("mape") if meta_model else None
+    confidence_label = _mape_to_confidence_label(mape)
 
     return {
         "model_name":              model_name,
@@ -259,8 +269,7 @@ def kpi_strip_data(model_name: str, granularity: str) -> dict:
         "next_week_vol":           round(next_week_vol) if next_week_vol else None,
         "pct_change_vs_last_week": pct_change,
         "confidence_label":        confidence_label,
-        "accuracy_pct":            accuracy_pct,
-        "smape":                   round(smape, 1) if smape is not None else None,
+        "mape":                    round(mape, 1) if mape is not None else None,
         "forecast_start":          forecast_start,
         "forecast_end":            forecast_end,
         "run_at":                  meta["run_at"] if meta else None,
@@ -582,7 +591,7 @@ def build_weekly_chart(model_name: str) -> str:
 # Model comparison (from registry — unchanged)
 # ---------------------------------------------------------------------------
 
-def _rmse_to_gradient_color(rank: int, total: int) -> str:
+def _mape_to_gradient_color(rank: int, total: int) -> str:
     if total <= 1:
         return "#22c55e"
     t = rank / (total - 1)
@@ -597,9 +606,15 @@ def model_comparison_data() -> list:
     metrics = (meta.get("metrics_by_model") or {}) if meta else {}
 
     ranked = sorted(
-        [(n, m) for n, m in metrics.items() if m.get("rmse") is not None],
-        key=lambda x: x[1]["rmse"],
+        [(n, m) for n, m in metrics.items() if m.get("mape") is not None],
+        key=lambda x: x[1]["mape"],
     )
+    # fallback to rmse ranking if mape not yet in _meta (old rows)
+    if not ranked:
+        ranked = sorted(
+            [(n, m) for n, m in metrics.items() if m.get("rmse") is not None],
+            key=lambda x: x[1]["rmse"],
+        )
     rank_map = {n: i for i, (n, _) in enumerate(ranked)}
     total = len(ranked)
 
@@ -612,7 +627,8 @@ def model_comparison_data() -> list:
             "mae":   m["mae"]   if m else None,
             "rmse":  m["rmse"]  if m else None,
             "smape": m["smape"] if m else None,
-            "color": _rmse_to_gradient_color(rank_map[name], total)
+            "mape":  m["mape"]  if m else None,
+            "color": _mape_to_gradient_color(rank_map[name], total)
                      if name in rank_map else "#334155",
         })
     return rows

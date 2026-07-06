@@ -1,4 +1,4 @@
-<section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+<section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
 
   {# Next-week forecast volume #}
   <div class="bg-surface-800 rounded-2xl border border-surface-700 p-4">
@@ -31,11 +31,11 @@
     <p class="text-xs text-slate-500 mt-0.5">change in volume</p>
   </div>
 
-  {# sMAPE scorecard #}
+  {# MAPE scorecard #}
   <div class="bg-surface-800 rounded-2xl border border-surface-700 p-4">
-    <p class="text-xs text-slate-500 mb-1">sMAPE</p>
-    {% if kpis.smape is not none %}
-      <p class="text-2xl font-semibold text-slate-100 tabular-nums">{{ kpis.smape }}%</p>
+    <p class="text-xs text-slate-500 mb-1">MAPE</p>
+    {% if kpis.mape is not none %}
+      <p class="text-2xl font-semibold text-slate-100 tabular-nums">{{ kpis.mape }}%</p>
       <p class="text-xs mt-0.5">
         {% if kpis.confidence_label == "High" %}
           <span style="color:#199e70;">&#x25CF; High confidence</span>
@@ -45,21 +45,11 @@
           <span style="color:#e66767;">&#x25CF; Low confidence</span>
         {% endif %}
       </p>
+      <p class="text-xs text-slate-600 mt-1">avg % error vs actual &mdash; lower is better</p>
     {% else %}
       <p class="text-2xl font-semibold text-slate-600">&mdash;</p>
       <p class="text-xs text-slate-500 mt-0.5">run notebook to score</p>
     {% endif %}
-  </div>
-
-  {# Holdout accuracy #}
-  <div class="bg-surface-800 rounded-2xl border border-surface-700 p-4">
-    <p class="text-xs text-slate-500 mb-1">Holdout accuracy</p>
-    {% if kpis.accuracy_pct is not none %}
-      <p class="text-2xl font-semibold text-slate-100 tabular-nums">{{ kpis.accuracy_pct }}%</p>
-    {% else %}
-      <p class="text-2xl font-semibold text-slate-600">&mdash;</p>
-    {% endif %}
-    <p class="text-xs text-slate-500 mt-0.5">{{ kpis.model_label }}</p>
   </div>
 
   {# Forecast run timestamp #}

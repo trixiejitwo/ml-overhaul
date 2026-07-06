@@ -21,11 +21,19 @@ def smape(y_true, y_pred):
     return 100 * np.mean(2 * np.abs(y_true[mask] - y_pred[mask]) / denominator[mask])
 
 
+def mape(y_true, y_pred):
+    y_true = np.array(y_true, dtype=float)
+    y_pred = np.array(y_pred, dtype=float)
+    mask = y_true != 0
+    return 100 * np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask]))
+
+
 def compute_metrics(y_true, y_pred, model_name: str) -> dict:
     return {
         "Model": model_name,
-        "MAE": round(mae(y_true, y_pred), 4),
-        "RMSE": round(rmse(y_true, y_pred), 4),
+        "MAE":   round(mae(y_true, y_pred), 4),
+        "RMSE":  round(rmse(y_true, y_pred), 4),
+        "MAPE":  round(mape(y_true, y_pred), 4),
         "sMAPE": round(smape(y_true, y_pred), 4),
     }
 
