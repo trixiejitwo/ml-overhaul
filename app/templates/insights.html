@@ -77,7 +77,7 @@
         <p class="text-sm font-medium text-slate-200">Daily Contact Volume by Category</p>
         <p class="text-xs text-slate-500">Last 90 days — stacked by L1 symptom code</p>
       </div>
-      <div id="chart-stacked" class="w-full"></div>
+      <div id="chart-stacked" class="w-full" style="min-height:340px"></div>
     </div>
 
     {# ── Row: paying users + contact rate ── #}
@@ -86,13 +86,13 @@
       <div class="bg-surface-800 border border-surface-700 rounded-xl p-5">
         <p class="text-sm font-medium text-slate-200 mb-0.5">Paying Users Growth</p>
         <p class="text-xs text-slate-500 mb-3">Weekly snapshots from Dec 2023</p>
-        <div id="chart-users" class="w-full"></div>
+        <div id="chart-users" class="w-full" style="min-height:260px"></div>
       </div>
 
       <div class="bg-surface-800 border border-surface-700 rounded-xl p-5">
         <p class="text-sm font-medium text-slate-200 mb-0.5">Contact Rate</p>
         <p class="text-xs text-slate-500 mb-3">Contacts per 1,000 paying users — weekly</p>
-        <div id="chart-rate" class="w-full"></div>
+        <div id="chart-rate" class="w-full" style="min-height:260px"></div>
       </div>
 
     </div>
@@ -103,13 +103,13 @@
       <div class="bg-surface-800 border border-surface-700 rounded-xl p-5">
         <p class="text-sm font-medium text-slate-200 mb-0.5">Weekly Ring Sell-Through</p>
         <p class="text-xs text-slate-500 mb-3">US total rings — retailer sell-through actuals</p>
-        <div id="chart-sales" class="w-full"></div>
+        <div id="chart-sales" class="w-full" style="min-height:260px"></div>
       </div>
 
       <div class="bg-surface-800 border border-surface-700 rounded-xl p-5">
         <p class="text-sm font-medium text-slate-200 mb-0.5">Contact Mix</p>
         <p class="text-xs text-slate-500 mb-3">% share by category — last 30 days</p>
-        <div id="chart-mix" class="w-full"></div>
+        <div id="chart-mix" class="w-full" style="min-height:280px"></div>
       </div>
 
     </div>
@@ -118,32 +118,36 @@
     <div class="bg-surface-800 border border-surface-700 rounded-xl p-5">
       <p class="text-sm font-medium text-slate-200 mb-0.5">Contact Heatmap — Hour of Day × Day of Week</p>
       <p class="text-xs text-slate-500 mb-3">Average hourly contact volume across all history</p>
-      <div id="chart-heatmap" class="w-full"></div>
+      <div id="chart-heatmap" class="w-full" style="min-height:260px"></div>
     </div>
 
   </main>
 </div>
 
 <script>
-(function () {
+var _insightsFigs = {
+  "chart-stacked":  {{ stacked     | safe }},
+  "chart-users":    {{ users_chart | safe }},
+  "chart-rate":     {{ rate_chart  | safe }},
+  "chart-sales":    {{ sales_chart | safe }},
+  "chart-mix":      {{ mix_chart   | safe }},
+  "chart-heatmap":  {{ heatmap     | safe }}
+};
+
+function _drawInsights() {
   var cfg = { displayModeBar: false, responsive: true };
-
-  function draw(id, json) {
-    var fig = JSON.parse(json);
+  Object.keys(_insightsFigs).forEach(function(id) {
+    var fig = _insightsFigs[id];
     Plotly.newPlot(id, fig.data, fig.layout, cfg);
-  }
-
-  draw("chart-stacked",  {{ stacked  | safe }});
-  draw("chart-users",    {{ users_chart | safe }});
-  draw("chart-rate",     {{ rate_chart  | safe }});
-  draw("chart-sales",    {{ sales_chart | safe }});
-  draw("chart-mix",      {{ mix_chart   | safe }});
-  draw("chart-heatmap",  {{ heatmap     | safe }});
-
-  window.addEventListener("resize", function () {
-    ["chart-stacked","chart-users","chart-rate","chart-sales","chart-mix","chart-heatmap"]
-      .forEach(function (id) { var el = document.getElementById(id); if (el) Plotly.Plots.resize(el); });
   });
-})();
+  window.addEventListener("resize", function () {
+    Object.keys(_insightsFigs).forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el && el.data) Plotly.Plots.resize(el);
+    });
+  });
+}
+
+_drawInsights();
 </script>
 {% endblock %}
