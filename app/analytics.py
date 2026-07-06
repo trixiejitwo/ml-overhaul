@@ -121,18 +121,24 @@ def _read_customers(spreadsheet) -> pd.Series:
     return df.set_index("Date").sort_index()["PayingUsers"]
 
 
-def _read_sales(spreadsheet) -> pd.Series:
+def _read_sales(spreadsheet) -> dict:
     ws    = spreadsheet.worksheet("Historical Sales")
     raw   = get_as_dataframe(ws, evaluate_formulas=True, header=None).dropna(how="all")
-    # Row 0 = dates, Row 24 = M7 total sell-through (all channels combined)
+    # Row 0 = dates, Row 2 = Actual/Forecast flag, Row 24 = M7 total sell-through
     dates = pd.to_datetime(raw.iloc[0, 4:], errors="coerce")
+    flags = raw.iloc[2, 4:]
     vals  = pd.to_numeric(raw.iloc[24, 4:], errors="coerce")
     valid = dates.notna() & vals.notna()
-    s     = pd.Series(vals[valid].values, index=dates[valid].values).sort_index()
-    # Drop final partial week if suspiciously small vs median
-    if len(s) > 4 and s.iloc[-1] < 0.2 * s.median():
-        s = s.iloc[:-1]
-    return s
+    df    = pd.DataFrame({
+        "date": dates[valid].values,
+        "flag": flags[valid].values,
+        "val":  vals[valid].values,
+    }).sort_values("date")
+    actual   = pd.Series(df[df["flag"] == "Actual"]["val"].values,
+                         index=df[df["flag"] == "Actual"]["date"].values)
+    forecast = pd.Series(df[df["flag"] == "Forecast"]["val"].values,
+                         index=df[df["flag"] == "Forecast"]["date"].values)
+    return {"actual": actual, "forecast": forecast}
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +169,7 @@ def _load() -> dict:
         daily_total=daily_total,
         daily_l1=daily_l1,
         customers=customers,
-        sales_actual=sales,
+        sales=sales,
         heatmap=heatmap,
         hourly=hourly,
     )
@@ -204,7 +210,7 @@ def kpi_data() -> dict:
     d = _get()
     daily_total = d["daily_total"]
     customers   = d["customers"]
-    sales       = d["sales_actual"]
+    sales       = d["sales"]
 
     latest_year = daily_total.index.max().year
     ytd = int(daily_total[daily_total.index.year == latest_year].sum())
@@ -223,7 +229,7 @@ def kpi_data() -> dict:
     users_pct    = ((latest_users - users_prev) / users_prev * 100) if users_prev else None
 
     contact_rate = round(last_wk / latest_users * 1000, 2) if latest_users else None
-    latest_sales = int(sales.iloc[-1]) if len(sales) else None
+    latest_sales = int(sales["actual"].iloc[-1]) if len(sales["actual"]) else None
 
     return dict(
         ytd_contacts=ytd,
@@ -293,14 +299,52 @@ def build_paying_users() -> str:
 
 
 def build_weekly_sales() -> str:
-    s = _get()["sales_actual"]
+    sales    = _get()["sales"]
+    actual   = sales["actual"]
+    forecast = sales["forecast"]
+
     fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=s.index, y=s.values,
-        marker_color=_CAT[1], opacity=0.85,
-        hovertemplate="Week of %{x|%b %d}<br>%{y:,.0f} rings<extra>Sell-through</extra>",
-        showlegend=False,
-    ))
+
+    # Faded forecast band — vrect equivalent via a filled Scatter behind the bars
+    if len(forecast):
+        fc_start = forecast.index[0]
+        fc_end   = forecast.index[-1] + pd.Timedelta(days=7)
+        # Use a shape for the background band
+        fig.add_vrect(
+            x0=fc_start, x1=fc_end,
+            fillcolor=_rgba(_CAT[1], 0.08),
+            line_width=0,
+            layer="below",
+        )
+        # Dashed divider line at forecast start
+        fig.add_vline(
+            x=fc_start.timestamp() * 1000,
+            line_width=1, line_dash="dash", line_color=_MUTED,
+        )
+        fig.add_annotation(
+            x=fc_start, y=1.0, yref="paper", showarrow=False,
+            text="Forecast", font=dict(size=10, color=_MUTED),
+            xanchor="left", yanchor="bottom", xshift=4,
+        )
+
+    # Actual bars
+    if len(actual):
+        fig.add_trace(go.Bar(
+            x=actual.index, y=actual.values,
+            name="Actual",
+            marker_color=_CAT[1], opacity=0.85,
+            hovertemplate="Week of %{x|%b %d}<br>%{y:,.0f} rings<extra>Actual</extra>",
+        ))
+
+    # Forecast bars — faded
+    if len(forecast):
+        fig.add_trace(go.Bar(
+            x=forecast.index, y=forecast.values,
+            name="Forecast",
+            marker_color=_CAT[1], opacity=0.35,
+            hovertemplate="Week of %{x|%b %d}<br>%{y:,.0f} rings<extra>Forecast</extra>",
+        ))
+
     fig.update_layout(**_LAYOUT_BASE, height=260, bargap=0.25,
                       xaxis=_axis_x(title=None),
                       yaxis=_axis_y(title="Rings sold"),
