@@ -378,7 +378,7 @@ def build_category_mix(trailing_days: int = 30) -> str:
                                     title_standoff=12,
                                     titlefont=dict(color=_MUTED, size=11)),
                       yaxis=dict(showgrid=False, color=_MUTED, tickfont=dict(color=_INK2),
-                                 ticklabelposition="outside", automargin=True),
+                                 automargin=True),
                       hovermode="y unified")
     return pio.to_json(fig)
 
