@@ -374,9 +374,10 @@ def build_category_mix(trailing_days: int = 30) -> str:
     ))
     layout = {**_LAYOUT_BASE, "margin": dict(l=120, r=70, t=28, b=56)}
     fig.update_layout(**layout, height=300,
-                      xaxis=_axis_x(title="% of total contacts", ticksuffix="%",
-                                    title_standoff=12,
-                                    titlefont=dict(color=_MUTED, size=11)),
+                      xaxis=_axis_x(
+                          title=dict(text="% of total contacts", font=dict(color=_MUTED, size=11), standoff=12),
+                          ticksuffix="%",
+                      ),
                       yaxis=dict(showgrid=False, color=_MUTED, tickfont=dict(color=_INK2),
                                  automargin=True),
                       hovermode="y unified")

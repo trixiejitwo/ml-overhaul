@@ -16,11 +16,14 @@ def create_app() -> Flask:
 
     @app.errorhandler(Exception)
     def handle_error(err):
+        from werkzeug.exceptions import HTTPException
+        if isinstance(err, HTTPException):
+            return err
         app.logger.exception("Unhandled error")
         from flask import render_template, request
         message = "Something went wrong loading this. Please try refreshing the page."
         if request.headers.get("HX-Request"):
-            return render_template("fragments/error.html", message=message), 200
-        return render_template("error.html", message=message), 200
+            return render_template("fragments/error.html", message=message), 500
+        return render_template("error.html", message=message), 500
 
     return app
