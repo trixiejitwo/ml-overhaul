@@ -260,6 +260,7 @@ def kpi_strip_data(model_name: str, granularity: str) -> dict:
         "pct_change_vs_last_week": pct_change,
         "confidence_label":        confidence_label,
         "accuracy_pct":            accuracy_pct,
+        "smape":                   round(smape, 1) if smape is not None else None,
         "forecast_start":          forecast_start,
         "forecast_end":            forecast_end,
         "run_at":                  meta["run_at"] if meta else None,
