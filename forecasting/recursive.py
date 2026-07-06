@@ -73,15 +73,21 @@ def blend_with_naive(ml_forecast: pd.Series, naive: pd.Series) -> pd.Series:
     return pd.Series(np.clip(blended, 0, None), index=ml_forecast.index)
 
 
-def recursive_forecast(model, history: pd.Series, start: pd.Timestamp, horizon: int, feature_cols: list) -> pd.Series:
+def recursive_forecast(
+    model,
+    history: pd.Series,
+    start: pd.Timestamp,
+    horizon: int,
+    feature_cols: list,
+    extra_features: pd.Series = None,
+) -> pd.Series:
     """
-    Iteratively forecast `horizon` hours starting at `start` (which may be
-    later than history.index.max() + 1h — any gap is bridged recursively so
-    lag/rolling features stay continuous, but only the [start, start+horizon)
-    window is returned).
+    Iteratively forecast `horizon` hours starting at `start`.
 
-    `model` must expose `.predict(X)` on a DataFrame restricted to
-    `feature_cols`, returning an array-like of length 1 per call here.
+    extra_features: optional hourly pd.Series of a single external regressor
+    (e.g. sales_lag1w) covering the full forecast window. The series name must
+    match the column name in feature_cols. For each step the known future value
+    is injected before predicting so it is never fed back from the model output.
     """
     working = history.copy()
     last_needed = start + pd.Timedelta(hours=horizon - 1)
@@ -89,10 +95,14 @@ def recursive_forecast(model, history: pd.Series, start: pd.Timestamp, horizon: 
     preds = {}
 
     for ts in full_index:
-        working.loc[ts] = np.nan  # placeholder so build_features can compute calendar feats for ts
+        working.loc[ts] = np.nan
         feat_row = build_features_for_forecast(working).loc[[ts]]
+        if extra_features is not None:
+            col = extra_features.name if extra_features.name else "sales_lag1w"
+            feat_row = feat_row.copy()
+            feat_row[col] = extra_features.get(ts, extra_features.iloc[-1])
         y_hat = model.predict(feat_row[feature_cols])[0]
-        y_hat = max(y_hat, 0.0)  # contacts cannot be negative
+        y_hat = max(y_hat, 0.0)
         working.loc[ts] = y_hat
         if ts >= start:
             preds[ts] = y_hat

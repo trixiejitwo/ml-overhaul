@@ -58,29 +58,49 @@ DEFAULT_PARAMS = {
         yearly_seasonality=False, weekly_seasonality=True, daily_seasonality=True,
     ),
     "Ridge": dict(alpha=1.0, random_state=42),
+    # +Sales variants inherit base model params; no separate defaults needed
+    "XGBoost+Sales":     dict(n_estimators=500, learning_rate=0.05, max_depth=6, subsample=0.8, colsample_bytree=0.8, random_state=42),
+    "LightGBM+Sales":    dict(n_estimators=500, learning_rate=0.05, num_leaves=63, subsample=0.8, colsample_bytree=0.8, random_state=42),
+    "RandomForest+Sales":dict(n_estimators=300, max_depth=15, min_samples_leaf=4, random_state=42),
+    "Ridge+Sales":       dict(alpha=1.0, random_state=42),
+    "Prophet+Sales":     dict(yearly_seasonality=False, weekly_seasonality=True, daily_seasonality=True),
 }
 
 MODEL_KIND = {
-    "XGBoost": "recursive",
-    "LightGBM": "recursive",
-    "RandomForest": "recursive",
-    "SeasonalNaive": "naive",
-    "HoltWinters": "native",
-    "Prophet": "native",
-    "Ridge": "recursive",
+    "XGBoost":            "recursive",
+    "LightGBM":           "recursive",
+    "RandomForest":       "recursive",
+    "SeasonalNaive":      "naive",
+    "HoltWinters":        "native",
+    "Prophet":            "native",
+    "Ridge":              "recursive",
+    "XGBoost+Sales":      "recursive_sales",
+    "LightGBM+Sales":     "recursive_sales",
+    "RandomForest+Sales": "recursive_sales",
+    "Ridge+Sales":        "recursive_sales",
+    "Prophet+Sales":      "native_sales",
 }
 
 MODEL_LABELS = {
-    "XGBoost": "XGBoost",
-    "LightGBM": "LightGBM",
-    "RandomForest": "Random Forest",
-    "SeasonalNaive": "Seasonal-Naive Baseline",
-    "HoltWinters": "Holt-Winters (ETS)",
-    "Prophet": "Prophet",
-    "Ridge": "Ridge Regression",
+    "XGBoost":            "XGBoost",
+    "LightGBM":           "LightGBM",
+    "RandomForest":       "Random Forest",
+    "SeasonalNaive":      "Seasonal-Naive Baseline",
+    "HoltWinters":        "Holt-Winters (ETS)",
+    "Prophet":            "Prophet",
+    "Ridge":              "Ridge Regression",
+    "XGBoost+Sales":      "XGBoost + Sales",
+    "LightGBM+Sales":     "LightGBM + Sales",
+    "RandomForest+Sales": "Random Forest + Sales",
+    "Ridge+Sales":        "Ridge + Sales",
+    "Prophet+Sales":      "Prophet + Sales",
 }
 
-MODEL_NAMES = list(MODEL_KIND.keys())
+# Base 7 models — always trained; +Sales variants trained separately when
+# sales data is provided to the pipeline.
+BASE_MODEL_NAMES  = ["XGBoost", "LightGBM", "RandomForest", "SeasonalNaive", "HoltWinters", "Prophet", "Ridge"]
+SALES_MODEL_NAMES = ["XGBoost+Sales", "LightGBM+Sales", "RandomForest+Sales", "Ridge+Sales", "Prophet+Sales"]
+MODEL_NAMES       = BASE_MODEL_NAMES + SALES_MODEL_NAMES
 
 
 def _prophet_holidays_df(years) -> pd.DataFrame:
@@ -100,12 +120,22 @@ def _prophet_holidays_df(years) -> pd.DataFrame:
 # train/test series.
 # ---------------------------------------------------------------------------
 
+def _base_name(model_name: str) -> str:
+    """Strip +Sales suffix to get the underlying estimator type."""
+    return model_name.replace("+Sales", "")
+
+
 def train_holdout(model_name: str, X_train, y_train, X_test, y_test,
                    series_train: pd.Series, series_test: pd.Series, params: dict = None) -> tuple:
-    """Returns (predictions: pd.Series indexed like y_test, metrics: dict)."""
-    params = {**DEFAULT_PARAMS.get(model_name, {}), **(params or {})}
+    """Returns (predictions: pd.Series indexed like y_test, metrics: dict).
 
-    if model_name == "XGBoost":
+    For +Sales models, X_train/X_test must already contain the sales_lag1w
+    column (added by pipeline via add_sales_regressor before calling here).
+    """
+    params = {**DEFAULT_PARAMS.get(model_name, {}), **(params or {})}
+    base = _base_name(model_name)
+
+    if base == "XGBoost":
         fit_params = {k: v for k, v in params.items() if k not in ("early_stopping_rounds",)}
         model = xgb.XGBRegressor(
             **fit_params, early_stopping_rounds=params.get("early_stopping_rounds", 50), verbosity=0,
@@ -114,7 +144,7 @@ def train_holdout(model_name: str, X_train, y_train, X_test, y_test,
         y_pred = np.clip(model.predict(X_test), 0, None)
         pred = pd.Series(y_pred, index=y_test.index)
 
-    elif model_name == "LightGBM":
+    elif base == "LightGBM":
         model = lgb.LGBMRegressor(**params, verbosity=-1)
         model.fit(
             X_train, y_train,
@@ -124,13 +154,13 @@ def train_holdout(model_name: str, X_train, y_train, X_test, y_test,
         y_pred = np.clip(model.predict(X_test), 0, None)
         pred = pd.Series(y_pred, index=y_test.index)
 
-    elif model_name == "RandomForest":
+    elif base == "RandomForest":
         model = RandomForestRegressor(**params, n_jobs=-1, verbose=0)
         model.fit(X_train, y_train)
         y_pred = np.clip(model.predict(X_test), 0, None)
         pred = pd.Series(y_pred, index=y_test.index)
 
-    elif model_name == "Ridge":
+    elif base == "Ridge":
         model = Ridge(**params)
         model.fit(X_train, y_train)
         y_pred = np.clip(model.predict(X_test), 0, None)
@@ -149,12 +179,19 @@ def train_holdout(model_name: str, X_train, y_train, X_test, y_test,
         y_pred = np.clip(model.forecast(len(series_test)), 0, None)
         pred = pd.Series(y_pred.values, index=series_test.index)
 
-    elif model_name == "Prophet":
+    elif base == "Prophet":
         years = range(series_train.index.year.min(), series_train.index.year.max() + 1)
         prophet_df = pd.DataFrame({"ds": series_train.index, "y": series_train.values})
-        model = Prophet(holidays=_prophet_holidays_df(years), **params)
+        p_params = {k: v for k, v in params.items()}
+        model = Prophet(holidays=_prophet_holidays_df(years), **p_params)
+        if model_name == "Prophet+Sales":
+            # sales_lag1w is a column in X_train/X_test — extract as regressor series
+            model.add_regressor("sales_lag1w")
+            prophet_df["sales_lag1w"] = X_train["sales_lag1w"].values
         model.fit(prophet_df)
         future = pd.DataFrame({"ds": series_test.index})
+        if model_name == "Prophet+Sales":
+            future["sales_lag1w"] = X_test["sales_lag1w"].values
         forecast = model.predict(future)
         y_pred = np.clip(forecast["yhat"].values, 0, None)
         pred = pd.Series(y_pred, index=series_test.index)
@@ -205,17 +242,45 @@ class NativeHorizonModel:
         return full.loc[start: start + pd.Timedelta(hours=horizon - 1)]
 
 
+class NativeSalesHorizonModel:
+    """Like NativeHorizonModel but carries future sales values for Prophet+Sales."""
+
+    def __init__(self, fitted_model, last_history_ts: pd.Timestamp, future_sales: pd.Series):
+        self.fitted_model = fitted_model
+        self.last_history_ts = last_history_ts
+        self.future_sales = future_sales  # hourly sales_lag1w for the forecast window
+
+    def forecast_horizon(self, start: pd.Timestamp, horizon: int) -> pd.Series:
+        last_needed = start + pd.Timedelta(hours=horizon - 1)
+        n_periods = int((last_needed - self.last_history_ts) / pd.Timedelta(hours=1))
+        full_index = pd.date_range(
+            start=self.last_history_ts + pd.Timedelta(hours=1), periods=n_periods, freq="h"
+        )
+        future = pd.DataFrame({"ds": full_index})
+        # Align future sales to the forecast index
+        sales_aligned = self.future_sales.reindex(full_index).ffill().bfill()
+        future["sales_lag1w"] = sales_aligned.values
+        forecast = self.fitted_model.predict(future)
+        full = pd.Series(np.clip(forecast["yhat"].values, 0, None), index=full_index)
+        return full.loc[start: start + pd.Timedelta(hours=horizon - 1)]
+
+
 def train_full(model_name: str, X_full: pd.DataFrame, y_full: pd.Series,
-                series_full: pd.Series, params: dict = None):
+                series_full: pd.Series, params: dict = None, future_sales: pd.Series = None):
     """
     Refit `model_name` on the full history. Returns either a fitted
     estimator with `.predict(X)` (recursive-kind models, used directly by
     forecasting.recursive.recursive_forecast) or a NativeHorizonModel
     (native-kind models). SeasonalNaive has no fitted model -- callers
     should special-case it.
+
+    For +Sales models, X_full must already contain sales_lag1w. For
+    Prophet+Sales, future_sales (hourly series covering the forecast window)
+    must also be supplied.
     """
     params = {**DEFAULT_PARAMS.get(model_name, {}), **(params or {})}
     kind = MODEL_KIND[model_name]
+    base = _base_name(model_name)
 
     if kind == "naive":
         return None
@@ -229,29 +294,34 @@ def train_full(model_name: str, X_full: pd.DataFrame, y_full: pd.Series,
         ).fit()
         return NativeHorizonModel("HoltWinters", model, series_full.index.max())
 
-    if model_name == "Prophet":
+    if base == "Prophet":
         years = range(series_full.index.year.min(), series_full.index.year.max() + 1)
         prophet_df = pd.DataFrame({"ds": series_full.index, "y": series_full.values})
         model = Prophet(holidays=_prophet_holidays_df(years), **params)
+        if model_name == "Prophet+Sales":
+            model.add_regressor("sales_lag1w")
+            prophet_df["sales_lag1w"] = X_full["sales_lag1w"].values
         model.fit(prophet_df)
+        if model_name == "Prophet+Sales":
+            return NativeSalesHorizonModel(model, series_full.index.max(), future_sales)
         return NativeHorizonModel("Prophet", model, series_full.index.max())
 
-    if model_name == "XGBoost":
+    if base == "XGBoost":
         model = xgb.XGBRegressor(**params, verbosity=0)
         model.fit(X_full, y_full)
         return model
 
-    if model_name == "LightGBM":
+    if base == "LightGBM":
         model = lgb.LGBMRegressor(**params, verbosity=-1)
         model.fit(X_full, y_full)
         return model
 
-    if model_name == "RandomForest":
+    if base == "RandomForest":
         model = RandomForestRegressor(**params, n_jobs=-1, verbose=0)
         model.fit(X_full, y_full)
         return model
 
-    if model_name == "Ridge":
+    if base == "Ridge":
         model = Ridge(**params)
         model.fit(X_full, y_full)
         return model

@@ -15,15 +15,23 @@ from gspread_dataframe import get_as_dataframe, set_with_dataframe
 import config
 from forecasting.ingestion import get_client
 
-MODEL_NAMES = ["XGBoost", "LightGBM", "RandomForest", "SeasonalNaive", "HoltWinters", "Prophet", "Ridge"]
+MODEL_NAMES = [
+    "XGBoost", "LightGBM", "RandomForest", "SeasonalNaive", "HoltWinters", "Prophet", "Ridge",
+    "XGBoost+Sales", "LightGBM+Sales", "RandomForest+Sales", "Ridge+Sales", "Prophet+Sales",
+]
 MODEL_LABELS = {
-    "XGBoost":      "XGBoost",
-    "LightGBM":     "LightGBM",
-    "RandomForest": "Random Forest",
-    "SeasonalNaive":"Seasonal-Naive Baseline",
-    "HoltWinters":  "Holt-Winters (ETS)",
-    "Prophet":      "Prophet",
-    "Ridge":        "Ridge Regression",
+    "XGBoost":            "XGBoost",
+    "LightGBM":           "LightGBM",
+    "RandomForest":       "Random Forest",
+    "SeasonalNaive":      "Seasonal-Naive Baseline",
+    "HoltWinters":        "Holt-Winters (ETS)",
+    "Prophet":            "Prophet",
+    "Ridge":              "Ridge Regression",
+    "XGBoost+Sales":      "XGBoost + Sales",
+    "LightGBM+Sales":     "LightGBM + Sales",
+    "RandomForest+Sales": "Random Forest + Sales",
+    "Ridge+Sales":        "Ridge + Sales",
+    "Prophet+Sales":      "Prophet + Sales",
 }
 
 # Fixed column positions in the horizontal layout so the reader never has to
@@ -56,29 +64,29 @@ def _model_col_names(suffix: str) -> list[str]:
 def build_forecast_df(forecasts: dict) -> pd.DataFrame:
     """
     Build the horizontal three-block export DataFrame from a dict of
-    model_name -> hourly blended pd.Series.  Mirrors the original notebook
-    layout so the sheet is human-readable as well as machine-parseable.
-
-    forecasts must contain every model in MODEL_NAMES; missing models raise
-    KeyError rather than silently producing wrong column offsets.
+    model_name -> hourly blended pd.Series.  Only models present in
+    `forecasts` are written; missing models produce no column (so a run
+    without +Sales models still produces a valid sheet).
     """
+    active_names = [n for n in MODEL_NAMES if n in forecasts]
+
     # --- Block A: Hourly ---
-    first = forecasts[MODEL_NAMES[0]]
+    first = forecasts[active_names[0]]
     block_a = pd.DataFrame({"Datetime": first.index.strftime("%Y-%m-%d %H:%M")})
-    for name in MODEL_NAMES:
+    for name in active_names:
         block_a[f"{MODEL_LABELS.get(name, name)}_Hourly"] = forecasts[name].values
 
     # --- Block B: Daily ---
-    daily = {n: forecasts[n].resample("D").sum() for n in MODEL_NAMES}
-    block_b = pd.DataFrame({"Date": daily[MODEL_NAMES[0]].index.strftime("%Y-%m-%d")})
-    for name in MODEL_NAMES:
+    daily = {n: forecasts[n].resample("D").sum() for n in active_names}
+    block_b = pd.DataFrame({"Date": daily[active_names[0]].index.strftime("%Y-%m-%d")})
+    for name in active_names:
         block_b[f"{MODEL_LABELS.get(name, name)}_Daily"] = daily[name].values
 
     # --- Block C: Weekly (Mon-anchored) ---
     weekly = {n: daily[n].resample("W-MON", label="left", closed="left").sum()
-              for n in MODEL_NAMES}
-    block_c = pd.DataFrame({"Week_Start": weekly[MODEL_NAMES[0]].index.strftime("%Y-%m-%d")})
-    for name in MODEL_NAMES:
+              for n in active_names}
+    block_c = pd.DataFrame({"Week_Start": weekly[active_names[0]].index.strftime("%Y-%m-%d")})
+    for name in active_names:
         block_c[f"{MODEL_LABELS.get(name, name)}_Weekly"] = weekly[name].values
 
     max_rows = max(len(block_a), len(block_b), len(block_c))

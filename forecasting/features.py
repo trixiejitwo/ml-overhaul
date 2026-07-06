@@ -1,4 +1,4 @@
-﻿"""
+"""
 Feature engineering: calendar features, US holiday flag, lag features,
 rolling aggregations. Ported unchanged in behavior from the original
 notebook's Section 6 (`build_features`) and Section 11.1
@@ -18,6 +18,9 @@ FORECAST_FEATURE_COLS = [
     "roll_mean_24", "roll_std_24", "roll_mean_168", "roll_std_168",
     "expanding_mean",
 ]
+
+# Same as above plus the sales regressor column (1-week lagged weekly rings).
+FORECAST_FEATURE_COLS_SALES = FORECAST_FEATURE_COLS + ["sales_lag1w"]
 
 LAG_HOURS = [1, 2, 3, 6, 12, 24, 48, 72, 168]
 ROLLING_WINDOWS = [6, 12, 24, 48, 168]
@@ -78,3 +81,37 @@ def build_features_for_forecast(s: pd.Series) -> pd.DataFrame:
     df["expanding_mean"] = df["target"].shift(1).expanding().mean()
 
     return df
+
+
+def add_sales_regressor(feature_df: pd.DataFrame, sales: pd.Series, lag_weeks: int = 1) -> pd.DataFrame:
+    """
+    Join a 1-week-lagged weekly sales regressor onto an hourly feature matrix.
+
+    sales: weekly pd.Series indexed by week-start Monday timestamps (from the
+           Historical Sales sheet). Both actuals and forecast values are expected
+           to already be combined in a single series before calling this.
+    lag_weeks: how many weeks to lag the sales signal (default 1 — sales from
+               week t-1 predicts contacts in week t).
+
+    Each hourly row gets the sales value from the week that is lag_weeks prior
+    to the row's own week. Weeks with no sales value are forward-filled then
+    back-filled so there are no NaN gaps at boundaries.
+    """
+    # Snap each hourly timestamp to its Monday week-start (floor to nearest Mon)
+    days_since_mon = feature_df.index.dayofweek  # Mon=0 … Sun=6
+    hour_week = (feature_df.index - pd.to_timedelta(days_since_mon, unit="D")).normalize()
+
+    # Build a lagged sales lookup: week W gets sales[W - lag_weeks]
+    sales_shifted = sales.copy()
+    sales_shifted.index = sales_shifted.index + pd.Timedelta(weeks=lag_weeks)
+    # Reindex to every week present in the feature matrix, fill gaps
+    all_weeks = pd.DatetimeIndex(sorted(set(hour_week)))
+    sales_aligned = sales_shifted.reindex(all_weeks).ffill().bfill()
+
+    # Map back to hourly rows
+    feature_df = feature_df.copy()
+    feature_df["sales_lag1w"] = pd.Series(hour_week, index=feature_df.index).map(sales_aligned).values
+    # Remaining NaNs (start of history before first sales week) → series median
+    med = feature_df["sales_lag1w"].median()
+    feature_df["sales_lag1w"] = feature_df["sales_lag1w"].fillna(med if pd.notna(med) else 0.0)
+    return feature_df
