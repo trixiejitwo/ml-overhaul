@@ -122,21 +122,17 @@ def _read_customers(spreadsheet) -> pd.Series:
 
 
 def _read_sales(spreadsheet) -> pd.Series:
-    ws       = spreadsheet.worksheet("Historical Sales")
-    raw      = get_as_dataframe(ws, evaluate_formulas=True, header=None).dropna(how="all")
-    dates_row = raw.iloc[1, 4:]
-    total_row = raw.iloc[7, 4:]
-    flag_row  = raw.iloc[3, 4:]
-    valid     = pd.to_datetime(dates_row, errors="coerce").notna()
-    dates     = pd.to_datetime(dates_row[valid], errors="coerce")
-    vals      = pd.to_numeric(total_row[valid], errors="coerce")
-    flags     = flag_row[valid]
-    sales     = pd.Series(vals.values, index=dates.values)
-    actual    = sales[flags.values == "Actual"].dropna()
-    # Drop final partial week if suspiciously small
-    if len(actual) > 4 and actual.iloc[-1] < 0.2 * actual.median():
-        actual = actual.iloc[:-1]
-    return actual
+    ws    = spreadsheet.worksheet("Historical Sales")
+    raw   = get_as_dataframe(ws, evaluate_formulas=True, header=None).dropna(how="all")
+    # Row 0 = dates, Row 24 = M7 total sell-through (all channels combined)
+    dates = pd.to_datetime(raw.iloc[0, 4:], errors="coerce")
+    vals  = pd.to_numeric(raw.iloc[24, 4:], errors="coerce")
+    valid = dates.notna() & vals.notna()
+    s     = pd.Series(vals[valid].values, index=dates[valid].values).sort_index()
+    # Drop final partial week if suspiciously small vs median
+    if len(s) > 4 and s.iloc[-1] < 0.2 * s.median():
+        s = s.iloc[:-1]
+    return s
 
 
 # ---------------------------------------------------------------------------
