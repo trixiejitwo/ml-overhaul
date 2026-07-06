@@ -372,10 +372,13 @@ def build_category_mix(trailing_days: int = 30) -> str:
         hovertemplate="%{y}<br>%{x:.1f}% of contacts<extra></extra>",
         showlegend=False,
     ))
-    layout = {**_LAYOUT_BASE, "margin": dict(l=110, r=60, t=28, b=24)}
-    fig.update_layout(**layout, height=280,
-                      xaxis=_axis_x(title="% of total contacts", ticksuffix="%"),
-                      yaxis=dict(showgrid=False, color=_MUTED, tickfont=dict(color=_INK2)),
+    layout = {**_LAYOUT_BASE, "margin": dict(l=120, r=70, t=28, b=56)}
+    fig.update_layout(**layout, height=300,
+                      xaxis=_axis_x(title="% of total contacts", ticksuffix="%",
+                                    title_standoff=12,
+                                    titlefont=dict(color=_MUTED, size=11)),
+                      yaxis=dict(showgrid=False, color=_MUTED, tickfont=dict(color=_INK2),
+                                 ticklabelposition="outside", automargin=True),
                       hovermode="y unified")
     return pio.to_json(fig)
 
@@ -387,8 +390,8 @@ def build_heatmap() -> str:
 
     fig = go.Figure(go.Heatmap(
         z=hm.values.tolist(), x=hours, y=days,
-        colorscale=[[0, _SURFACE], [0.001, "#1e3a5f"], [0.4, "#2a78d6"],
-                    [0.7, "#3987e5"], [1.0, "#86b6ef"]],
+        colorscale=[[0, "#dbeafe"], [0.15, "#93c5fd"], [0.4, "#3b82f6"],
+                    [0.7, "#1d4ed8"], [1.0, "#1e3a8a"]],
         hoverongaps=False,
         hovertemplate="%{y} %{x}<br>avg %{z:,.0f} contacts<extra></extra>",
         showscale=True,

@@ -84,6 +84,28 @@ def sorted_model_options():
     return [(r["model_name"], r["model_label"]) for r in ordered]
 
 
+@fragments_bp.route("/insights-data")
+def insights_data():
+    from app import analytics
+    kpis        = analytics.kpi_data()
+    stacked     = analytics.build_stacked_area()
+    users_chart = analytics.build_paying_users()
+    sales_chart = analytics.build_weekly_sales()
+    mix_chart   = analytics.build_category_mix()
+    heatmap     = analytics.build_heatmap()
+    rate_chart  = analytics.build_contact_rate()
+    return render_template(
+        "fragments/insights_data.html",
+        kpis=kpis,
+        stacked=stacked,
+        users_chart=users_chart,
+        sales_chart=sales_chart,
+        mix_chart=mix_chart,
+        heatmap=heatmap,
+        rate_chart=rate_chart,
+    )
+
+
 @fragments_bp.route("/export/csv")
 def export_csv():
     """Download the current model's forecast series as CSV."""

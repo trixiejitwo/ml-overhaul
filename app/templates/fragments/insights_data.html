@@ -1,0 +1,123 @@
+{# Full insights content — swapped in by htmx after data loads #}
+
+{# ── KPI strip ── #}
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3" id="insights-kpis">
+
+  <div class="bg-surface-800 border border-surface-700 rounded-xl p-4">
+    <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">YTD Contacts</p>
+    <p class="text-2xl font-semibold text-slate-100 tabular-nums">
+      {{ "{:,.0f}".format(kpis.ytd_contacts) }}
+    </p>
+    <p class="text-xs text-slate-500 mt-1">Jan 1 – {{ kpis.data_through }}</p>
+  </div>
+
+  <div class="bg-surface-800 border border-surface-700 rounded-xl p-4">
+    <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Last Full Week</p>
+    <p class="text-2xl font-semibold text-slate-100 tabular-nums">
+      {{ "{:,.0f}".format(kpis.weekly_contacts) }}
+    </p>
+    {% if kpis.wow_pct is not none %}
+      {% if kpis.wow_pct >= 0 %}
+        <p class="text-xs mt-1" style="color:#e66767;">▲ {{ kpis.wow_pct }}% vs prior week</p>
+      {% else %}
+        <p class="text-xs mt-1" style="color:#199e70;">▼ {{ kpis.wow_pct|abs }}% vs prior week</p>
+      {% endif %}
+    {% endif %}
+  </div>
+
+  <div class="bg-surface-800 border border-surface-700 rounded-xl p-4">
+    <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Paying Users</p>
+    <p class="text-2xl font-semibold text-slate-100 tabular-nums">
+      {{ "{:,.0f}".format(kpis.paying_users) }}
+    </p>
+    {% if kpis.users_pct is not none %}
+      <p class="text-xs mt-1" style="color:#199e70;">▲ {{ kpis.users_pct }}% vs 4 wks ago</p>
+    {% endif %}
+  </div>
+
+  <div class="bg-surface-800 border border-surface-700 rounded-xl p-4">
+    <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Contact Rate</p>
+    <p class="text-2xl font-semibold text-slate-100 tabular-nums">
+      {{ kpis.contact_rate }}
+    </p>
+    <p class="text-xs text-slate-500 mt-1">contacts per 1,000 paying users</p>
+  </div>
+
+</div>
+
+{# ── Stacked area ── #}
+<div class="bg-surface-800 border border-surface-700 rounded-xl p-5">
+  <div class="mb-3">
+    <p class="text-sm font-medium text-slate-200">Daily Contact Volume by Category</p>
+    <p class="text-xs text-slate-500">Last 90 days — stacked by L1 symptom code</p>
+  </div>
+  <div id="chart-stacked" class="w-full" style="min-height:340px"></div>
+</div>
+
+{# ── Row: paying users + contact rate ── #}
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+  <div class="bg-surface-800 border border-surface-700 rounded-xl p-5">
+    <p class="text-sm font-medium text-slate-200 mb-0.5">Paying Users Growth</p>
+    <p class="text-xs text-slate-500 mb-3">Weekly snapshots from Dec 2023</p>
+    <div id="chart-users" class="w-full" style="min-height:260px"></div>
+  </div>
+
+  <div class="bg-surface-800 border border-surface-700 rounded-xl p-5">
+    <p class="text-sm font-medium text-slate-200 mb-0.5">Contact Rate</p>
+    <p class="text-xs text-slate-500 mb-3">Contacts per 1,000 paying users — weekly</p>
+    <div id="chart-rate" class="w-full" style="min-height:260px"></div>
+  </div>
+
+</div>
+
+{# ── Row: weekly sales + category mix ── #}
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+  <div class="bg-surface-800 border border-surface-700 rounded-xl p-5">
+    <p class="text-sm font-medium text-slate-200 mb-0.5">Weekly Ring Sell-Through</p>
+    <p class="text-xs text-slate-500 mb-3">US total rings — retailer sell-through actuals</p>
+    <div id="chart-sales" class="w-full" style="min-height:260px"></div>
+  </div>
+
+  <div class="bg-surface-800 border border-surface-700 rounded-xl p-5">
+    <p class="text-sm font-medium text-slate-200 mb-0.5">Contact Mix</p>
+    <p class="text-xs text-slate-500 mb-3">% share by category — last 30 days</p>
+    <div id="chart-mix" class="w-full" style="min-height:300px"></div>
+  </div>
+
+</div>
+
+{# ── Heatmap ── #}
+<div class="bg-surface-800 border border-surface-700 rounded-xl p-5">
+  <p class="text-sm font-medium text-slate-200 mb-0.5">Contact Heatmap — Hour of Day × Day of Week</p>
+  <p class="text-xs text-slate-500 mb-3">Average hourly contact volume across all history</p>
+  <div id="chart-heatmap" class="w-full" style="min-height:260px"></div>
+</div>
+
+<script>
+(function () {
+  var figs = {
+    "chart-stacked":  {{ stacked     | safe }},
+    "chart-users":    {{ users_chart | safe }},
+    "chart-rate":     {{ rate_chart  | safe }},
+    "chart-sales":    {{ sales_chart | safe }},
+    "chart-mix":      {{ mix_chart   | safe }},
+    "chart-heatmap":  {{ heatmap     | safe }}
+  };
+  var cfg = { displayModeBar: false, responsive: true };
+  Object.keys(figs).forEach(function (id) {
+    Plotly.newPlot(id, figs[id].data, figs[id].layout, cfg);
+  });
+  window.addEventListener("resize", function () {
+    Object.keys(figs).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el && el.data) Plotly.Plots.resize(el);
+    });
+  });
+
+  // Hide the loading overlay now that charts are ready
+  var loader = document.getElementById("insights-loader");
+  if (loader) loader.style.display = "none";
+})();
+</script>
