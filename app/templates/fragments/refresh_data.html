@@ -7,6 +7,3 @@
 <div id="dashboard-data" hx-swap-oob="innerHTML">
   {% include "fragments/dashboard_data.html" %}
 </div>
-
-{# Bust tab-switch caches so the next visit to either page re-fetches fresh data #}
-<script>sessionStorage.removeItem("forecast_html_cache"); sessionStorage.removeItem("forecast_ctx_cache"); sessionStorage.removeItem("insights_html_cache");</script>

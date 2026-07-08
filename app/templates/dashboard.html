@@ -33,41 +33,12 @@
 
   {# ---------- Main content ---------- #}
   <main class="flex-1 px-6 py-6 max-w-7xl mx-auto w-full">
-    <div id="dashboard-data">
+    <div id="dashboard-data"
+         hx-get="/fragments/dashboard-data?model={{ model_name }}&granularity={{ granularity }}"
+         hx-trigger="load"
+         hx-swap="innerHTML">
       {% include "fragments/dashboard_skeleton.html" %}
     </div>
   </main>
 </div>
-
-<script>
-(function () {
-  var CACHE_KEY  = "forecast_html_cache";
-  var CACHE_CTX  = "forecast_ctx_cache";
-  var model      = {{ model_name | tojson }};
-  var gran       = {{ granularity | tojson }};
-  var ctx        = model + "|" + gran;
-  var container  = document.getElementById("dashboard-data");
-
-  var cachedCtx  = sessionStorage.getItem(CACHE_CTX);
-  var cachedHtml = sessionStorage.getItem(CACHE_KEY);
-
-  if (cachedHtml && cachedCtx === ctx) {
-    container.innerHTML = cachedHtml;
-    container.querySelectorAll("script").forEach(function (oldScript) {
-      var s = document.createElement("script");
-      if (oldScript.src) { s.src = oldScript.src; } else { s.textContent = oldScript.textContent; }
-      oldScript.parentNode.replaceChild(s, oldScript);
-    });
-    return;
-  }
-
-  htmx.ajax("GET", "/fragments/dashboard-data?model=" + encodeURIComponent(model) + "&granularity=" + encodeURIComponent(gran), {
-    target: "#dashboard-data",
-    swap: "innerHTML",
-  }).then(function () {
-    sessionStorage.setItem(CACHE_KEY, container.innerHTML);
-    sessionStorage.setItem(CACHE_CTX, ctx);
-  });
-})();
-</script>
 {% endblock %}
