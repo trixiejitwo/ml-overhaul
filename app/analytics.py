@@ -379,7 +379,7 @@ def build_category_mix(trailing_days: int = 30) -> str:
                           ticksuffix="%",
                       ),
                       yaxis=dict(showgrid=False, color=_MUTED, tickfont=dict(color=_INK2),
-                                 automargin=True),
+                                 automargin=True, ticklabelstandoff=8),
                       hovermode="y unified")
     return pio.to_json(fig)
 
