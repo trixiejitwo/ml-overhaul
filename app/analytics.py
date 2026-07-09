@@ -259,10 +259,9 @@ def _axis_y(**kw):
 
 def build_stacked_area(trailing_days: int = 90) -> str:
     d  = _get()
-    df = d["daily_l1"]  # full history — range slider lets user scrub back
-
-    x_end   = df.index.max()
-    x_start = x_end - pd.Timedelta(days=trailing_days)  # default view: 90 days
+    df = d["daily_l1"]
+    cutoff = df.index.max() - pd.Timedelta(days=trailing_days)
+    df = df[df.index > cutoff]
 
     fig = go.Figure()
     for i, cat in enumerate(_L1_SHOW):
@@ -275,39 +274,10 @@ def build_stacked_area(trailing_days: int = 90) -> str:
             fillcolor=_rgba(_CAT[i], 0.75),
             hovertemplate="%{x|%b %d}<br>%{y:,.0f} contacts<extra>" + _L1_SHORT[cat] + "</extra>",
         ))
-
-    rangeselector = dict(
-        buttons=[
-            dict(count=30,  label="30d", step="day",  stepmode="backward"),
-            dict(count=90,  label="90d", step="day",  stepmode="backward"),
-            dict(count=6,   label="6m",  step="month", stepmode="backward"),
-            dict(step="all", label="All"),
-        ],
-        bgcolor=_GRID,
-        activecolor=_CAT[0],
-        bordercolor=_GRID,
-        font=dict(color=_INK2, size=11),
-        x=0, y=1.18,
-    )
-
-    fig.update_layout(
-        **_LAYOUT_BASE,
-        height=380,
-        margin=dict(l=48, r=16, t=52, b=40),
-        xaxis=_axis_x(
-            title=None,
-            range=[x_start, x_end],
-            rangeselector=rangeselector,
-            rangeslider=dict(
-                visible=True,
-                thickness=0.06,
-                bgcolor=_GRID,
-                bordercolor=_GRID,
-            ),
-        ),
-        yaxis=_axis_y(title="Daily contacts"),
-        hovermode="x unified",
-    )
+    fig.update_layout(**_LAYOUT_BASE, height=340,
+                      xaxis=_axis_x(title=None),
+                      yaxis=_axis_y(title="Daily contacts"),
+                      hovermode="x unified")
     return pio.to_json(fig)
 
 
