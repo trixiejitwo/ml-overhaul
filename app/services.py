@@ -636,10 +636,11 @@ def model_comparison_data() -> list:
         rows.append({
             "model_name":  name,
             "model_label": MODEL_LABELS.get(name, name),
-            "mae":   m["mae"]   if m else None,
-            "rmse":  m["rmse"]  if m else None,
-            "smape": m["smape"] if m else None,
-            "mape":  m["mape"]  if m else None,
+            "mae":         m["mae"]         if m else None,
+            "rmse":        m["rmse"]        if m else None,
+            "smape":       m["smape"]       if m else None,
+            "mape":        m["mape"]        if m else None,
+            "mape_weekly": m["mape_weekly"] if m else None,
             "color": _mape_to_gradient_color(rank_map[name], total)
                      if name in rank_map else "#334155",
         })

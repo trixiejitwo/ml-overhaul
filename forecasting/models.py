@@ -199,7 +199,7 @@ def train_holdout(model_name: str, X_train, y_train, X_test, y_test,
     else:
         raise ValueError(f"Unknown model: {model_name}")
 
-    metrics = compute_metrics(series_test.values, pred.values, MODEL_LABELS.get(model_name, model_name))
+    metrics = compute_metrics(series_test, pred, MODEL_LABELS.get(model_name, model_name))
     return pred, metrics
 
 

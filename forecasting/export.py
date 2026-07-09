@@ -174,7 +174,7 @@ def _upsert_meta(spreadsheet, sheet_name: str, run_at: datetime,
     """
     metric_cols = []
     for name in MODEL_NAMES:
-        metric_cols += [f"{name}_mae", f"{name}_rmse", f"{name}_smape", f"{name}_mape"]
+        metric_cols += [f"{name}_mae", f"{name}_rmse", f"{name}_smape", f"{name}_mape", f"{name}_mape_weekly"]
 
     try:
         meta_ws = spreadsheet.worksheet(META_SHEET)
@@ -205,7 +205,7 @@ def _upsert_meta(spreadsheet, sheet_name: str, run_at: datetime,
     if metrics_by_model:
         for name in MODEL_NAMES:
             m = metrics_by_model.get(name, {})
-            for suffix, key in (("_mae", "mae"), ("_rmse", "rmse"), ("_smape", "smape"), ("_mape", "mape")):
+            for suffix, key in (("_mae", "mae"), ("_rmse", "rmse"), ("_smape", "smape"), ("_mape", "mape"), ("_mape_weekly", "mape_weekly")):
                 col = f"{name}{suffix}"
                 if col in col_index:
                     row[col_index[col]] = m.get(key, "")

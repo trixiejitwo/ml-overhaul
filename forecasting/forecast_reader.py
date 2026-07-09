@@ -80,16 +80,20 @@ def get_latest_meta(dest_url: str = None) -> dict | None:
     # Read per-model metrics if present (written by publish_forecast_run)
     metrics_by_model = {}
     for name in MODEL_NAMES:
-        mae_col   = f"{name}_mae"
-        rmse_col  = f"{name}_rmse"
-        smape_col = f"{name}_smape"
-        mape_col  = f"{name}_mape"
+        mae_col        = f"{name}_mae"
+        rmse_col       = f"{name}_rmse"
+        smape_col      = f"{name}_smape"
+        mape_col       = f"{name}_mape"
+        mape_weekly_col= f"{name}_mape_weekly"
         if rmse_col in last.index and pd.notna(last[rmse_col]):
+            def _f(col):
+                return float(last[col]) if col in last.index and pd.notna(last[col]) else None
             metrics_by_model[name] = {
-                "mae":   float(last[mae_col])   if mae_col   in last.index and pd.notna(last[mae_col])   else None,
-                "rmse":  float(last[rmse_col])  if rmse_col  in last.index and pd.notna(last[rmse_col])  else None,
-                "smape": float(last[smape_col]) if smape_col in last.index and pd.notna(last[smape_col]) else None,
-                "mape":  float(last[mape_col])  if mape_col  in last.index and pd.notna(last[mape_col])  else None,
+                "mae":         _f(mae_col),
+                "rmse":        _f(rmse_col),
+                "smape":       _f(smape_col),
+                "mape":        _f(mape_col),
+                "mape_weekly": _f(mape_weekly_col),
             }
 
     return {

@@ -1,24 +1,43 @@
 <div class="bg-surface-800 rounded-2xl border border-surface-700 p-5">
-  <h2 class="text-sm font-semibold text-slate-100 mb-1">Model Error Comparison</h2>
+  <div class="flex items-center justify-between mb-1">
+    <h2 class="text-sm font-semibold text-slate-100">Model Error Comparison</h2>
+    <div class="flex gap-1" id="mape-toggle">
+      <button onclick="setMapeView('hourly')" id="btn-hourly"
+              class="px-2 py-0.5 text-xs rounded font-medium transition-colors bg-surface-600 text-slate-200">
+        Hourly MAPE
+      </button>
+      <button onclick="setMapeView('weekly')" id="btn-weekly"
+              class="px-2 py-0.5 text-xs rounded font-medium transition-colors bg-surface-700 text-slate-500">
+        Weekly MAPE
+      </button>
+    </div>
+  </div>
   <p class="text-xs text-slate-500 mb-1">Sorted best to worst &mdash; shorter bar &amp; greener = better</p>
-  <p class="text-xs text-slate-600 mb-4">MAPE = average % error vs. actual contacts on the holdout period. Lower is better.</p>
+  <p class="text-xs text-slate-600 mb-4" id="mape-desc">MAPE = average % error vs. actual contacts on the holdout period. Lower is better.</p>
 
   {% if comparison %}
-  <div class="space-y-2.5">
+  {# Embed both MAPE and MAPE_weekly as data attributes for JS toggle #}
+  <div class="space-y-2.5" id="mape-bars">
     {% set ranked = comparison | selectattr('mape', 'ne', none) | sort(attribute='mape') | list %}
     {% set unranked = comparison | selectattr('mape', 'equalto', none) | list %}
     {% set ranked = ranked + unranked %}
     {% set max_mape = (comparison | selectattr('mape', 'ne', none) | map(attribute='mape') | list | max) if ranked else 1 %}
+    {% set max_mape_weekly = (comparison | selectattr('mape_weekly', 'ne', none) | map(attribute='mape_weekly') | list | max) if ranked else 1 %}
     {% for row in ranked %}
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3 mape-row"
+           data-mape="{{ row.mape if row.mape is not none else '' }}"
+           data-mape-weekly="{{ row.mape_weekly if row.mape_weekly is not none else '' }}"
+           data-max-mape="{{ max_mape }}"
+           data-max-mape-weekly="{{ max_mape_weekly }}"
+           data-color="{{ row.color }}">
         <span class="w-28 text-xs text-slate-400 shrink-0 truncate">{{ row.model_label }}</span>
         <div class="flex-1 h-2 rounded-full bg-surface-700 overflow-hidden">
           {% if row.mape is not none %}
-            <div class="h-full rounded-full transition-all duration-500"
+            <div class="mape-bar h-full rounded-full transition-all duration-500"
                  style="width: {{ (row.mape / max_mape * 100) | round(1) }}%; background-color: {{ row.color }};"></div>
           {% endif %}
         </div>
-        <span class="w-16 text-right text-xs font-mono text-slate-500 shrink-0">
+        <span class="mape-label w-16 text-right text-xs font-mono text-slate-500 shrink-0">
           {% if row.mape is not none %}
             {{ "%.1f"|format(row.mape) }}%
           {% else %}
@@ -38,6 +57,7 @@
           <th class="py-1 font-medium text-right text-slate-400">MAE</th>
           <th class="py-1 font-medium text-right text-slate-400">RMSE</th>
           <th class="py-1 font-medium text-right text-slate-400">MAPE</th>
+          <th class="py-1 font-medium text-right text-slate-400">MAPE wk</th>
           <th class="py-1 font-medium text-right text-slate-400">sMAPE</th>
         </tr>
       </thead>
@@ -48,6 +68,7 @@
           <td class="py-1 text-right">{{ "%.1f"|format(row.mae) if row.mae is not none else "&mdash;" }}</td>
           <td class="py-1 text-right">{{ "%.1f"|format(row.rmse) if row.rmse is not none else "&mdash;" }}</td>
           <td class="py-1 text-right">{{ "%.1f"|format(row.mape) if row.mape is not none else "&mdash;" }}%</td>
+          <td class="py-1 text-right">{{ "%.1f"|format(row.mape_weekly) if row.mape_weekly is not none else "&mdash;" }}%</td>
           <td class="py-1 text-right">{{ "%.1f"|format(row.smape) if row.smape is not none else "&mdash;" }}%</td>
         </tr>
         {% endfor %}
@@ -58,3 +79,46 @@
   <p class="text-sm text-slate-500">No model runs logged yet. Run the training notebook to populate this view.</p>
   {% endif %}
 </div>
+
+<script>
+(function () {
+  var _mapeView = 'hourly';
+
+  function setMapeView(view) {
+    _mapeView = view;
+    var btnHourly = document.getElementById('btn-hourly');
+    var btnWeekly = document.getElementById('btn-weekly');
+    var desc = document.getElementById('mape-desc');
+
+    if (view === 'hourly') {
+      btnHourly.className = 'px-2 py-0.5 text-xs rounded font-medium transition-colors bg-surface-600 text-slate-200';
+      btnWeekly.className = 'px-2 py-0.5 text-xs rounded font-medium transition-colors bg-surface-700 text-slate-500';
+      desc.textContent = 'MAPE = average % error vs. actual contacts on the holdout period. Lower is better.';
+    } else {
+      btnHourly.className = 'px-2 py-0.5 text-xs rounded font-medium transition-colors bg-surface-700 text-slate-500';
+      btnWeekly.className = 'px-2 py-0.5 text-xs rounded font-medium transition-colors bg-surface-600 text-slate-200';
+      desc.textContent = 'Weekly MAPE = % error on weekly-resampled totals. Hourly errors partially cancel, so this is typically lower.';
+    }
+
+    var rows = document.querySelectorAll('.mape-row');
+    rows.forEach(function (row) {
+      var val    = view === 'hourly' ? parseFloat(row.dataset.mape)       : parseFloat(row.dataset.mapeWeekly);
+      var maxVal = view === 'hourly' ? parseFloat(row.dataset.maxMape)    : parseFloat(row.dataset.maxMapeWeekly);
+      var color  = row.dataset.color;
+      var bar    = row.querySelector('.mape-bar');
+      var label  = row.querySelector('.mape-label');
+
+      if (isNaN(val)) {
+        if (bar)   { bar.style.width = '0%'; }
+        if (label) { label.textContent = '—'; }
+      } else {
+        var pct = maxVal > 0 ? (val / maxVal * 100).toFixed(1) : '0';
+        if (bar)   { bar.style.width = pct + '%'; bar.style.backgroundColor = color; }
+        if (label) { label.textContent = val.toFixed(1) + '%'; }
+      }
+    });
+  }
+
+  window.setMapeView = setMapeView;
+})();
+</script>
