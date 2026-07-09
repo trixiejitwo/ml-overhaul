@@ -68,7 +68,8 @@ MODEL_COLORS = {
 # Ingestion cache — live hourly contacts series
 # ---------------------------------------------------------------------------
 
-_ing_lock  = threading.Lock()
+_ing_lock      = threading.Lock()
+_ing_load_lock = threading.Lock()   # coalesces concurrent cold-start loads
 _ing_state = {
     "series":      None,
     "data_as_of":  None,
@@ -89,7 +90,13 @@ def _ensure_ingestion_loaded():
     with _ing_lock:
         loaded = _ing_state["loaded_at"]
     if loaded is None:
-        _load_ingestion()
+        # Coalesce concurrent cold-start requests: only one thread runs
+        # _load_ingestion(); the rest block here and share its result.
+        with _ing_load_lock:
+            with _ing_lock:
+                loaded = _ing_state["loaded_at"]
+            if loaded is None:
+                _load_ingestion()
     elif time.monotonic() - loaded > _ING_TTL:
         t = threading.Thread(target=_load_ingestion, daemon=True)
         t.start()
@@ -117,7 +124,8 @@ def refresh_ingestion() -> dict:
 # Forecast cache — latest run from the forecast spreadsheet
 # ---------------------------------------------------------------------------
 
-_fc_lock  = threading.Lock()
+_fc_lock      = threading.Lock()
+_fc_load_lock = threading.Lock()   # coalesces concurrent cold-start loads
 _fc_state = {
     "meta":       None,   # dict from get_latest_meta()
     "blocks":     None,   # dict {"hourly": df, "daily": df, "weekly": df}
@@ -141,7 +149,11 @@ def _ensure_forecast_loaded():
     with _fc_lock:
         loaded = _fc_state["loaded_at"]
     if loaded is None:
-        _load_forecast()
+        with _fc_load_lock:
+            with _fc_lock:
+                loaded = _fc_state["loaded_at"]
+            if loaded is None:
+                _load_forecast()
     elif time.monotonic() - loaded > _FC_TTL:
         t = threading.Thread(target=_load_forecast, daemon=True)
         t.start()

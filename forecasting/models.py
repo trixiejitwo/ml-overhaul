@@ -155,7 +155,7 @@ def train_holdout(model_name: str, X_train, y_train, X_test, y_test,
         pred = pd.Series(y_pred, index=y_test.index)
 
     elif base == "RandomForest":
-        model = RandomForestRegressor(**params, n_jobs=-1, verbose=0)
+        model = RandomForestRegressor(**params, n_jobs=1, verbose=0)
         model.fit(X_train, y_train)
         y_pred = np.clip(model.predict(X_test), 0, None)
         pred = pd.Series(y_pred, index=y_test.index)
@@ -317,7 +317,7 @@ def train_full(model_name: str, X_full: pd.DataFrame, y_full: pd.Series,
         return model
 
     if base == "RandomForest":
-        model = RandomForestRegressor(**params, n_jobs=-1, verbose=0)
+        model = RandomForestRegressor(**params, n_jobs=1, verbose=0)
         model.fit(X_full, y_full)
         return model
 

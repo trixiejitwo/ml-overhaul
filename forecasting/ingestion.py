@@ -6,12 +6,28 @@ Ported unchanged in behavior from the original notebook's Section 4
 (`ingest_hourly_sheet`, `clean_series`), with column names and credentials
 parameterized instead of hardcoded.
 """
+import time
+
 import gspread
 import pandas as pd
 from google.oauth2.service_account import Credentials
 from gspread_dataframe import get_as_dataframe
+from gspread.exceptions import APIError
 
 import config
+
+
+def _sheets_call_with_retry(fn, retries=4, base_delay=15):
+    """Call fn(); retry up to `retries` times on 429 with exponential backoff."""
+    for attempt in range(retries + 1):
+        try:
+            return fn()
+        except APIError as e:
+            if e.response.status_code == 429 and attempt < retries:
+                wait = base_delay * (2 ** attempt)
+                time.sleep(wait)
+            else:
+                raise
 
 
 def get_client() -> gspread.Client:
@@ -35,12 +51,15 @@ def ingest_hourly_sheet(spreadsheet_url: str, sheet_name: str) -> pd.DataFrame:
     The sheet has a title row (row 0) followed by a header row (row 1),
     so we skip the first row when reading via gspread-dataframe.
     """
-    client = get_client()
-    spreadsheet = client.open_by_url(spreadsheet_url)
-    ws = spreadsheet.worksheet(sheet_name)
-    df = get_as_dataframe(ws, evaluate_formulas=True, header=1)
-    df.dropna(how="all", inplace=True)
-    return df
+    def _fetch():
+        client = get_client()
+        spreadsheet = client.open_by_url(spreadsheet_url)
+        ws = spreadsheet.worksheet(sheet_name)
+        df = get_as_dataframe(ws, evaluate_formulas=True, header=1)
+        df.dropna(how="all", inplace=True)
+        return df
+
+    return _sheets_call_with_retry(_fetch)
 
 
 def clean_series(
