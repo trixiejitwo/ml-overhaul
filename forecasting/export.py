@@ -182,11 +182,13 @@ def _upsert_meta(spreadsheet, sheet_name: str, run_at: datetime,
         existing_header = meta_ws.row_values(1)
         missing = [c for c in metric_cols if c not in existing_header]
         if missing:
-            # Extend the header row with the missing metric columns
             new_header = existing_header + missing
+            # Resize the sheet if it's too narrow to hold the new columns
+            if len(new_header) > meta_ws.col_count:
+                meta_ws.resize(rows=meta_ws.row_count, cols=len(new_header) + 10)
             meta_ws.update([new_header], "A1")
     except Exception:
-        meta_ws = spreadsheet.add_worksheet(title=META_SHEET, rows=500, cols=50)
+        meta_ws = spreadsheet.add_worksheet(title=META_SHEET, rows=500, cols=100)
         header = ["sheet_name", "run_at", "data_as_of", "horizon_hours"] + metric_cols
         meta_ws.append_row(header, value_input_option="RAW")
 
